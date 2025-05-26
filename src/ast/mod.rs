@@ -1,0 +1,33 @@
+use std::fmt::Debug;
+
+pub mod literal;
+
+pub trait Parse: Sized {
+    type Error: Debug;
+
+    fn parse(input: &str) -> Result<(Self, &str), Self::Error>;
+}
+
+pub fn strip_whitespace(s: &str) -> &str {
+    let idx = s
+        .char_indices()
+        .take_while(|(_, c)| c.is_whitespace())
+        .map(|(idx, _)| idx)
+        .last()
+        .unwrap_or(0);
+
+    &s[idx..]
+}
+
+pub fn extract(s: &str, predicate: impl Fn(&char) -> bool) -> (&str, &str) {
+    let end = s
+        .char_indices()
+        .find_map(|(idx, c)| if predicate(&c) { None } else { Some(idx) })
+        .unwrap_or(s.len());
+
+    (&s[..end], &s[end..])
+}
+
+pub fn extract_whitespace(s: &str) -> &str {
+    extract(s, |c| c.is_ascii_whitespace()).1
+}
