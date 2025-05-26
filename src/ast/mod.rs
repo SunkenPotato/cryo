@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+pub mod expr;
 pub mod literal;
 
 pub trait Parse: Sized {
@@ -28,6 +29,6 @@ pub fn extract(s: &str, predicate: impl Fn(&char) -> bool) -> (&str, &str) {
     (&s[..end], &s[end..])
 }
 
-pub fn extract_whitespace(s: &str) -> &str {
-    extract(s, |c| c.is_ascii_whitespace()).1
+pub fn extract_whitespace(input: &str) -> &str {
+    extract(input, |c| c.is_ascii_whitespace()).1
 }
