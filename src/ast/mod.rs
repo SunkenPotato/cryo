@@ -1,12 +1,26 @@
 use std::fmt::Debug;
 
-pub mod expr;
 pub mod literal;
 
 pub trait Parse: Sized {
     type Error: Debug;
 
     fn parse(input: &str) -> Result<(Self, &str), Self::Error>;
+}
+
+/// Commodity for mapping parse results into their superclass results.
+pub trait ParseResultInto<T> {
+    fn into2(self) -> T;
+}
+
+impl<'s, T, TW, E, EW> ParseResultInto<Result<(TW, &'s str), EW>> for Result<(T, &'s str), E>
+where
+    T: Into<TW>,
+    E: Into<EW>,
+{
+    fn into2(self) -> Result<(TW, &'s str), EW> {
+        self.map(|(t, s)| (t.into(), s)).map_err(|e| e.into())
+    }
 }
 
 pub fn strip_whitespace(s: &str) -> &str {

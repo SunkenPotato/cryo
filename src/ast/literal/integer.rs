@@ -1,32 +1,10 @@
-use crate::error_group;
-
-use super::{Parse, extract, strip_whitespace};
+use crate::ast::{Parse, extract, strip_whitespace};
 
 pub const NEGATE_OP: char = '-';
 pub const INT_SEPARATOR: char = '_';
 pub const ZERO_CODE_POINT: i32 = 0x30;
 
-error_group! {
-    #[derive(Debug)]
-    pub enum LiteralParseError {
-        IntegerParseError
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Literal {
-    Integer(Integer),
-}
-
-impl Parse for Literal {
-    type Error = LiteralParseError;
-
-    fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
-        Ok(Integer::parse(input)?)
-    }
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum IntegerParseError {
     Empty,
     OverflowError,
@@ -77,7 +55,7 @@ impl Parse for Integer {
 mod tests {
     use crate::ast::{
         Parse,
-        literal::{Integer, IntegerParseError},
+        literal::integer::{Integer, IntegerParseError},
     };
 
     #[test]

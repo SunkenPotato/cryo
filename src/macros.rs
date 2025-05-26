@@ -1,26 +1,25 @@
 #[macro_export]
-macro_rules! error_group {
+macro_rules! group {
     (
         $(#[$attr:meta])*
-        $visibility:vis enum $identifier:ident {
-            $($variant_id:ident),*
+        $visibility:vis enum $group:ident {
+            $($variant:ident($variant_type:ty)),*
         }
     ) => {
-        $(
-            #[$attr]
-        )*
-        $visibility enum $identifier {
+        $(#[$attr])*
+
+        $visibility enum $group {
             $(
-                $variant_id($variant_id),
+                $variant($variant_type),
             )*
         }
 
         $(
-            impl From<$variant_id> for $identifier {
-                fn from(value: $variant_id) -> Self {
-                    Self::$variant_id(value)
+            impl From<$variant_type> for $group {
+                fn from(value: $variant_type) -> Self {
+                    $group::$variant(value)
                 }
             }
         )*
-    };
+    }
 }
