@@ -11,7 +11,7 @@ pub enum IntegerParseError {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct Integer(i32);
+pub struct Integer(pub i32);
 
 impl Parse for Integer {
     type Error = IntegerParseError;

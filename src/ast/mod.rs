@@ -1,6 +1,7 @@
-use std::fmt::Debug;
-
+pub mod expr;
 pub mod literal;
+
+use std::fmt::Debug;
 
 pub trait Parse: Sized {
     type Error: Debug;
@@ -24,14 +25,7 @@ where
 }
 
 pub fn strip_whitespace(s: &str) -> &str {
-    let idx = s
-        .char_indices()
-        .take_while(|(_, c)| c.is_whitespace())
-        .map(|(idx, _)| idx)
-        .last()
-        .unwrap_or(0);
-
-    &s[idx..]
+    extract(s, |c| c.is_ascii_whitespace()).1
 }
 
 pub fn extract(s: &str, predicate: impl Fn(&char) -> bool) -> (&str, &str) {
