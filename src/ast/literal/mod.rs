@@ -1,4 +1,5 @@
 pub mod integer;
+pub mod string;
 
 use integer::{Integer, IntegerParseError};
 

@@ -40,3 +40,11 @@ pub fn extract(s: &str, predicate: impl Fn(&char) -> bool) -> (&str, &str) {
 pub fn extract_whitespace(input: &str) -> &str {
     extract(input, |c| c.is_ascii_whitespace()).1
 }
+
+pub fn tag<'a, 'b>(pat: &'a str, s: &'b str) -> Option<&'b str> {
+    if s.starts_with(pat) {
+        return Some(&s[pat.len()..]);
+    }
+
+    None
+}

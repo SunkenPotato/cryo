@@ -126,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_math_exprs() {
+    fn parse_math_expr() {
         let expr = "5 + 7 / 2";
 
         assert_eq!(
