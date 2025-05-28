@@ -2,13 +2,13 @@ use crate::ast::{Parse, tag};
 
 pub const STRING_DELIMITER: &str = "\"";
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum StringParseError {
     DelimiterNotFound,
     InvalidEscape,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct StringLiteral(pub String);
 
 impl Parse for StringLiteral {
