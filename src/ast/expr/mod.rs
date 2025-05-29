@@ -25,7 +25,7 @@ group! {
     }
 }
 
-impl Parse for Expr {
+impl<'a> Parse<'a> for Expr {
     type Error = ExprParseError;
 
     fn parse(input: &str) -> Result<(Self, &str), Self::Error> {

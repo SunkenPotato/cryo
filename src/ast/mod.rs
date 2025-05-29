@@ -3,10 +3,40 @@ pub mod literal;
 
 use std::fmt::Debug;
 
-pub trait Parse: Sized {
+#[derive(Debug, PartialEq)]
+pub enum IdentifierParseError {
+    InvalidToken,
+    Empty,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Identifier<'a>(pub &'a str);
+
+impl<'a> Parse<'a> for Identifier<'a> {
+    type Error = IdentifierParseError;
+
+    fn parse(mut input: &'a str) -> Result<(Identifier<'a>, &'a str), Self::Error> {
+        input = extract_whitespace(input);
+        let (id, rest) = extract(input, |c| !c.is_whitespace());
+        if input.is_empty() {
+            return Err(IdentifierParseError::Empty);
+        }
+
+        // this is OK because we checked if the string is empty, meaning the string has at least ONE character
+        if input.chars().next().unwrap().is_ascii_digit() || !input.is_ascii() {
+            return Err(IdentifierParseError::InvalidToken);
+        }
+
+        Ok((Identifier(id), rest))
+    }
+}
+
+pub trait Parse<'a>: Sized {
     type Error: Debug;
 
-    fn parse(input: &str) -> Result<(Self, &str), Self::Error>;
+    fn parse(input: &'a str) -> Result<(Self, &'a str), Self::Error>
+    where
+        Self: 'a;
 }
 
 /// Commodity for mapping parse results into their superclass results.

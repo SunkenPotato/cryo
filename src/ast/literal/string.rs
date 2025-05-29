@@ -11,7 +11,7 @@ pub enum StringParseError {
 #[derive(Debug, PartialEq, Clone)]
 pub struct StringLiteral(pub String);
 
-impl Parse for StringLiteral {
+impl<'a> Parse<'a> for StringLiteral {
     type Error = StringParseError;
 
     fn parse(input: &str) -> Result<(Self, &str), Self::Error> {

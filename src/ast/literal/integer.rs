@@ -13,7 +13,7 @@ pub enum IntegerParseError {
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Integer(pub i32);
 
-impl Parse for Integer {
+impl<'a> Parse<'a> for Integer {
     type Error = IntegerParseError;
 
     fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
