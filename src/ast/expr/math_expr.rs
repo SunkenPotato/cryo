@@ -20,7 +20,7 @@ pub struct MathExpr {
     pub rhs: Expr,
 }
 
-impl<'a> Parse<'a> for MathExpr {
+impl Parse for MathExpr {
     type Error = MathExprParseError;
 
     fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
@@ -32,7 +32,7 @@ impl<'a> Parse<'a> for MathExpr {
                 ));
             }
         };
-        let (op, rest) = dbg!(Op::parse(rest)?);
+        let (op, rest) = Op::parse(rest)?;
         let (rhs, rest) = Expr::parse(rest)?;
         let lhs = Expr::Literal(lhs);
 
@@ -57,7 +57,7 @@ pub enum OpParseError {
     Empty,
 }
 
-impl<'a> Parse<'a> for Op {
+impl Parse for Op {
     type Error = OpParseError;
 
     fn parse(input: &str) -> Result<(Self, &str), Self::Error> {

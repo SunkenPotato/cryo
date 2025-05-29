@@ -11,7 +11,7 @@ pub enum StringParseError {
 #[derive(Debug, PartialEq, Clone)]
 pub struct StringLiteral(pub String);
 
-impl<'a> Parse<'a> for StringLiteral {
+impl Parse for StringLiteral {
     type Error = StringParseError;
 
     fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
@@ -20,8 +20,6 @@ impl<'a> Parse<'a> for StringLiteral {
         let mut iter = input.bytes();
         let mut str = vec![];
         let mut end = 0;
-
-        println!("{input}");
 
         while let Some(byte) = iter.next() {
             end += 1;

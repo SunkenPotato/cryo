@@ -25,7 +25,7 @@ group! {
     }
 }
 
-impl<'a> Parse<'a> for Literal {
+impl Parse for Literal {
     type Error = LiteralParseError;
 
     fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
