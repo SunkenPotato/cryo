@@ -1,19 +1,22 @@
+pub mod binding_ref;
+pub mod math_expr;
+
+use binding_ref::BindingRef;
 use math_expr::{MathExpr, MathExprParseError};
 
 use crate::group;
 
 use super::{
-    Parse, ParseResultInto,
+    IdentifierParseError, Parse, ParseResultInto,
     literal::{Literal, LiteralParseError},
 };
-
-pub mod math_expr;
 
 group! {
     #[derive(Debug, PartialEq)]
     pub enum ExprParseError {
         LiteralParseError(LiteralParseError),
-        MathExprParseError(Box<MathExprParseError>)
+        MathExprParseError(Box<MathExprParseError>),
+        IdentifierParseError(IdentifierParseError)
     }
 }
 
@@ -21,7 +24,8 @@ group! {
     #[derive(Debug, PartialEq)]
     pub enum Expr {
         Literal(Literal),
-        MathExpr(Box<MathExpr>)
+        MathExpr(Box<MathExpr>),
+        BindingRef(BindingRef)
     }
 }
 
@@ -29,18 +33,9 @@ impl Parse for Expr {
     type Error = ExprParseError;
 
     fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
-        // try parsing mathexpression
-        // if fails:
-        // try parsing literal
-
-        // mathexpression:
-        // try parsing
-        //  lit op mathexpr
-        //
-        // if fails try
-        //  go to start
         MathExpr::parse(input)
             .map(|(r, s)| (Expr::MathExpr(Box::new(r)), s))
             .or_else(|_| Literal::parse(input).into2())
+            .or_else(|_: ExprParseError| BindingRef::parse(input).into2())
     }
 }
