@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{any::Any, fmt::Display, str::FromStr};
 
 use internment::Intern;
 
@@ -15,11 +15,29 @@ pub trait Validate: Sized {
 #[derive(PartialEq, Eq, Debug)]
 pub enum Token {
     Keyword(Keyword) = 0,
-    Identifier(Identifier) = -1,
-    Literal(Literal) = -2,
-    Assign(Assign) = -3,
-    Operation(Operation) = -4,
-    Semicolon(Semicolon) = -5,
+    Identifier(Identifier) = 1,
+    Literal(Literal) = 2,
+    Assign(Assign) = 3,
+    Operation(Operation) = 4,
+    Semicolon(Semicolon) = 5,
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_display())
+    }
+}
+
+pub struct AnyToken<'a>(&'a dyn Any);
+
+impl<'a> AnyToken<'a> {
+    pub fn require<T: 'static>(self) -> Option<&'a T> {
+        self.0.downcast_ref::<T>()
+    }
+
+    pub fn require_err<T: 'static, E>(self, e: E) -> Result<&'a T, E> {
+        self.0.downcast_ref::<T>().ok_or(e)
+    }
 }
 
 impl Token {
@@ -31,6 +49,28 @@ impl Token {
         Operation::lex,
         Semicolon::lex,
     ];
+
+    pub fn as_any(&self) -> AnyToken<'_> {
+        AnyToken(match self {
+            Self::Keyword(v) => v,
+            Self::Identifier(v) => v,
+            Self::Literal(v) => v,
+            Self::Assign(v) => v,
+            Self::Operation(v) => v,
+            Self::Semicolon(v) => v,
+        })
+    }
+
+    pub fn as_display(&self) -> &dyn Display {
+        match self {
+            Self::Keyword(v) => v,
+            Self::Identifier(v) => v,
+            Self::Literal(v) => v,
+            Self::Assign(v) => v,
+            Self::Operation(v) => v,
+            Self::Semicolon(v) => v,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -46,6 +86,12 @@ impl FromStr for Keyword {
             "let" => Self::Let,
             _ => return Err(()),
         })
+    }
+}
+
+impl Display for Keyword {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -83,6 +129,12 @@ pub struct Identifier(Intern<String>);
 impl Identifier {
     pub fn new(s: impl Into<String>) -> Self {
         Self(Intern::new(s.into()))
+    }
+}
+
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -126,6 +178,21 @@ pub enum Literal {
     NumberLiteral(String),
 }
 
+impl Literal {
+    pub fn as_display(&self) -> &dyn Display {
+        match self {
+            Self::StringLiteral(v) => v,
+            Self::NumberLiteral(v) => v,
+        }
+    }
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_display())
+    }
+}
+
 impl Validate for Literal {
     fn lex(s: &str) -> Result<(Token, &str), LexicalError> {
         // Try parsing a string
@@ -142,16 +209,8 @@ impl Validate for Literal {
                 // if it's valid, advance
                 // else fail
                 if byte == '\\' {
-                    let next_byte = *peekable.peek().ok_or_else(|| {
-                        LexicalError::new(5, &s[..end], "string terminated too early")
-                    })?;
-
-                    if next_byte == '"' {
-                        end += 1;
-                        peekable.next();
-                    } else {
-                        break;
-                    }
+                    end += 1;
+                    peekable.next();
                 } else if byte == '"' {
                     closed = true;
                     break;
@@ -188,6 +247,12 @@ impl Validate for Literal {
 #[derive(PartialEq, Eq, Debug)]
 pub struct Assign;
 
+impl Display for Assign {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "=")
+    }
+}
+
 impl Validate for Assign {
     fn lex(s: &str) -> Result<(Token, &str), LexicalError> {
         tag("=", s)
@@ -198,6 +263,12 @@ impl Validate for Assign {
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct Semicolon;
+
+impl Display for Semicolon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, ";")
+    }
+}
 
 impl Validate for Semicolon {
     fn lex(s: &str) -> Result<(Token, &str), LexicalError> {
@@ -216,8 +287,8 @@ pub enum Operation {
     Mod,
 }
 
-#[cfg(test)]
 impl Operation {
+    #[cfg(test)]
     pub const fn from_char(c: char) -> Self {
         match c {
             '+' => Self::Add,
@@ -227,6 +298,22 @@ impl Operation {
             '%' => Self::Mod,
             _ => panic!(),
         }
+    }
+
+    pub fn as_char(&self) -> &str {
+        match self {
+            Self::Add => "+",
+            Self::Sub => "-",
+            Self::Mul => "*",
+            Self::Div => "/",
+            Self::Mod => "%",
+        }
+    }
+}
+
+impl Display for Operation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_char())
     }
 }
 

@@ -93,13 +93,14 @@ impl Lexer {
 mod tests {
     use super::{tokens::*, *};
 
+    #[macro_export]
     macro_rules! token {
         (id $id:tt) => {
             Token::Identifier(Identifier::new(stringify!($id)))
         };
 
         (ls $ls:expr) => {
-            Token::Literal(Literal::StringLiteral($ls))
+            Token::Literal(Literal::StringLiteral($ls.into()))
         };
 
         (ln $ln:expr) => {
