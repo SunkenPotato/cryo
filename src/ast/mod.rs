@@ -1,6 +1,6 @@
 pub mod expr;
 
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use crate::lexer::tokens::Token;
 
@@ -20,6 +20,7 @@ macro_rules! parse_error {
     };
 
     ($code:literal, $id:ident, $message:literal) => {
+        #[must_use]
         pub fn $id(tokens: &'t [Token]) -> Self {
             Self {
                 code: $code,
@@ -30,6 +31,7 @@ macro_rules! parse_error {
     };
 }
 
+#[derive(Debug)]
 pub struct ParseError<'t> {
     pub code: u16,
     pub tokens: &'t [Token],
@@ -53,10 +55,22 @@ impl<'t> ParseError<'t> {
     parse_error!(3, invalid_type);
     parse_error!(4, numerical_overflow, "number is too large");
     parse_error!(5, invalid_escape);
+    parse_error!(6, expected_operation, "expected arithmetic operation");
+    parse_error!(7, invalid_token);
 }
+
+impl PartialEq for ParseError<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.code == other.code
+    }
+}
+
+impl Eq for ParseError<'_> {}
 
 pub struct Parser;
 
 impl Parser {
-    pub fn parse(input: &[Token]) {}
+    pub fn parse(mut input: &[Token]) {
+        todo!()
+    }
 }

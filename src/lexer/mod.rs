@@ -56,6 +56,7 @@ impl Display for LexicalError<'_> {
 pub struct Lexer;
 
 impl Lexer {
+    #[allow(clippy::missing_panics_doc)]
     pub fn lex(string: &str) -> Result<Vec<Token>, LexicalError> {
         let mut next = string.trim();
         let mut stream = vec![];
@@ -91,38 +92,44 @@ impl Lexer {
 
 #[cfg(test)]
 mod tests {
-    use super::{tokens::*, *};
+    use super::*;
 
     #[macro_export]
     macro_rules! token {
         (id $id:tt) => {
-            Token::Identifier(Identifier::new(stringify!($id)))
+            $crate::lexer::tokens::Token::Identifier($crate::lexer::tokens::Identifier::new(
+                stringify!($id),
+            ))
         };
 
         (ls $ls:expr) => {
-            Token::Literal(Literal::StringLiteral($ls.into()))
+            $crate::lexer::tokens::Token::Literal($crate::lexer::tokens::Literal::StringLiteral(
+                $ls.into(),
+            ))
         };
 
         (ln $ln:expr) => {
-            Token::Literal(Literal::NumberLiteral(stringify!($ln).to_owned()))
+            $crate::lexer::tokens::Token::Literal($crate::lexer::tokens::Literal::NumberLiteral(
+                stringify!($ln).to_owned(),
+            ))
         };
 
         (=) => {
-            Token::Assign(Assign)
+            $crate::lexer::tokens::Token::Assign($crate::lexer::tokens::Assign)
         };
 
         (;) => {
-            Token::Semicolon(Semicolon)
+            $crate::lexer::tokens::Token::Semicolon($crate::lexer::tokens::Semicolon)
         };
 
         (op $op:tt) => {
-            Token::Operation(Operation::from_char(
+            $crate::lexer::tokens::Token::Operation($crate::lexer::tokens::Operation::from_char(
                 stringify!($op).chars().next().unwrap(),
             ))
         };
 
         (let) => {
-            Token::Keyword(Keyword::Let)
+            $crate::lexer::tokens::Token::Keyword($crate::lexer::tokens::Keyword::Let)
         };
     }
 

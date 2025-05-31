@@ -11,15 +11,15 @@ pub trait Validate: Sized {
     fn lex(s: &str) -> Result<(Token, &str), LexicalError>;
 }
 
-#[repr(i8)]
+#[repr(u8)]
 #[derive(PartialEq, Eq, Debug)]
 pub enum Token {
-    Keyword(Keyword) = 0,
-    Identifier(Identifier) = 1,
-    Literal(Literal) = 2,
-    Assign(Assign) = 3,
-    Operation(Operation) = 4,
-    Semicolon(Semicolon) = 5,
+    Keyword(Keyword) = Self::KEYWORD_TOKEN,
+    Identifier(Identifier) = Self::IDENTIFIER_TOKEN,
+    Literal(Literal) = Self::LITERAL_TOKEN,
+    Assign(Assign) = Self::ASSIGN_TOKEN,
+    Operation(Operation) = Self::OPERATION_TOKEN,
+    Semicolon(Semicolon) = Self::SEMICOLON_TOKEN,
 }
 
 impl Display for Token {
@@ -31,6 +31,7 @@ impl Display for Token {
 pub struct AnyToken<'a>(&'a dyn Any);
 
 impl<'a> AnyToken<'a> {
+    #[must_use]
     pub fn require<T: 'static>(self) -> Option<&'a T> {
         self.0.downcast_ref::<T>()
     }
@@ -50,6 +51,7 @@ impl Token {
         Semicolon::lex,
     ];
 
+    #[must_use]
     pub fn as_any(&self) -> AnyToken<'_> {
         AnyToken(match self {
             Self::Keyword(v) => v,
@@ -61,6 +63,7 @@ impl Token {
         })
     }
 
+    #[must_use]
     pub fn as_display(&self) -> &dyn Display {
         match self {
             Self::Keyword(v) => v,
@@ -70,6 +73,21 @@ impl Token {
             Self::Operation(v) => v,
             Self::Semicolon(v) => v,
         }
+    }
+
+    pub const KEYWORD_TOKEN: u8 = 0;
+    pub const IDENTIFIER_TOKEN: u8 = 1;
+    pub const LITERAL_TOKEN: u8 = 2;
+    pub const ASSIGN_TOKEN: u8 = 3;
+    pub const OPERATION_TOKEN: u8 = 4;
+    pub const SEMICOLON_TOKEN: u8 = 5;
+
+    /// Check whether the current token matches the supplied discriminant.
+    ///
+    /// Use the associated constants of this struct with this function.
+    #[must_use]
+    pub fn is(&self, d: u8) -> bool {
+        unsafe { *<*const _>::from(self).cast::<u8>() == d }
     }
 }
 
@@ -98,6 +116,7 @@ impl Display for Keyword {
 impl Keyword {
     pub const VARIANTS: &[Self] = &[Self::Let];
 
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Let => "let",
@@ -179,10 +198,10 @@ pub enum Literal {
 }
 
 impl Literal {
+    #[must_use]
     pub fn as_display(&self) -> &dyn Display {
         match self {
-            Self::StringLiteral(v) => v,
-            Self::NumberLiteral(v) => v,
+            Self::StringLiteral(v) | Self::NumberLiteral(v) => v,
         }
     }
 }
@@ -278,7 +297,7 @@ impl Validate for Semicolon {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Operation {
     Add,
     Sub,
@@ -289,6 +308,7 @@ pub enum Operation {
 
 impl Operation {
     #[cfg(test)]
+    #[must_use]
     pub const fn from_char(c: char) -> Self {
         match c {
             '+' => Self::Add,
@@ -300,6 +320,7 @@ impl Operation {
         }
     }
 
+    #[must_use]
     pub fn as_char(&self) -> &str {
         match self {
             Self::Add => "+",

@@ -3,9 +3,32 @@ use crate::{
     lexer::tokens::{Literal as LiteralToken, Token},
 };
 
+#[derive(Debug, PartialEq)]
 pub enum Literal {
     StringLiteral(StringLiteral),
     NumberLiteral(NumberLiteral),
+}
+
+impl Parse for Literal {
+    fn parse(stream: &[Token]) -> Result<(Self, &[Token]), ParseError> {
+        let token = stream.first().ok_or(ParseError::end_of_input(stream))?;
+        let literal: &LiteralToken = token
+            .as_any()
+            .require_err(ParseError::expected_literal(&stream[0..1]))?;
+
+        match literal {
+            LiteralToken::NumberLiteral(_) => {
+                let (parsed, rest) = NumberLiteral::parse(stream)?;
+
+                Ok((Self::NumberLiteral(parsed), rest))
+            }
+            LiteralToken::StringLiteral(_) => {
+                let (parsed, rest) = StringLiteral::parse(stream)?;
+
+                Ok((Self::StringLiteral(parsed), rest))
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -78,7 +101,7 @@ impl Parse for NumberLiteral {
                 num = num
                     .checked_mul(10)
                     .ok_or(ParseError::numerical_overflow(&stream[0..1]))?
-                    .checked_add(byte as i32 - 0x30)
+                    .checked_add(i32::from(byte) - 0x30)
                     .ok_or(ParseError::numerical_overflow(&stream[0..1]))?;
             }
 
