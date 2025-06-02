@@ -1,18 +1,38 @@
-use std::fmt::Display;
-
+use thiserror::Error;
 use tokens::Token;
 
+use crate::{
+    lexer::tokens::TokenType,
+    span::{LexResultExt, SourceFile, SourceFileError, SourceMap, Span},
+};
+
+pub mod identifier;
+pub mod keyword;
+pub mod literal;
+pub mod operation;
+pub mod single;
 pub mod tokens;
+
+/// The file index to use with spans, since there multiple files are not supported yet.
+pub const INITIAL_FILE: usize = 0;
+
+pub trait Lex: Sized {
+    /// Parse a string into a token.
+    ///
+    /// Assumes whitespace has already been stripped.
+    /// # Errors
+    /// The `Span` returned is the erroneous section.
+    fn lex(input: &str) -> Result<(Token, &str), Span>;
+}
 
 #[must_use]
 pub fn tag<'s>(pat: &str, s: &'s str) -> Option<&'s str> {
     s.strip_prefix(pat)
 }
 
-pub fn extract(s: &str, f: fn(u8) -> bool) -> (&str, &str) {
+pub fn extract(s: &str, f: fn(char) -> bool) -> (&str, &str) {
     let end = s
-        .bytes()
-        .enumerate()
+        .char_indices()
         .find_map(|(idx, c)| if f(c) { Some(idx) } else { None })
         .unwrap_or(s.len());
 
@@ -24,130 +44,126 @@ pub fn extract_whitespace(s: &str) -> &str {
     extract(s, |b| !b.is_ascii_whitespace()).1
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct LexicalError<'s> {
-    code: u8,
-    invalid_section: &'s str,
-    message: String,
+/// Represents the lexer mode.
+///
+/// The lexer can either read a direct `String` or the contents of a `File`.
+pub enum LexerMode {
+    DirectInput(String),
+    File(String),
 }
 
-impl<'s> LexicalError<'s> {
-    pub fn new(code: u8, invalid_section: &'s str, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            invalid_section,
-            message: message.into(),
-        }
-    }
+pub struct Lexer {
+    mode: LexerMode,
 }
 
-impl Display for LexicalError<'_> {
+#[derive(Error, Debug)]
+pub enum LexicalError {
+    SourceFileError(#[from] SourceFileError),
+    ProblematicSpan(#[from] Span),
+}
+
+impl std::fmt::Display for LexicalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "error[{}]: {}", self.code, self.message)?;
+        match self {
+            Self::SourceFileError(v) => {
+                write!(f, "error: Could not read file: {v}")?;
+            }
 
-        for line in self.invalid_section.lines() {
-            write!(f, "|\t{line}")?;
+            Self::ProblematicSpan(span) => {
+                writeln!(f, "error: failed to parse input")?;
+                write!(f, "{span}")?;
+            }
         }
 
         Ok(())
     }
 }
 
-pub struct Lexer;
-
 impl Lexer {
+    #[must_use]
+    pub const fn new(mode: LexerMode) -> Self {
+        Self { mode }
+    }
+
     #[allow(clippy::missing_panics_doc)]
-    pub fn lex(string: &str) -> Result<Vec<Token>, LexicalError> {
-        let mut next = string.trim();
-        let mut stream = vec![];
-
-        while !next.is_empty() {
-            let mut possible_token = None;
-            let mut possible_error = None;
-
-            'parse: for f in Token::PARSE_FUNCTIONS {
-                match f(next) {
-                    Ok((token, rest)) => {
-                        next = extract_whitespace(rest);
-                        dbg!(&token, next, rest);
-                        possible_token = Some(token);
-                        break 'parse;
-                    }
-
-                    Err(e) => possible_error = Some(e),
-                }
-            }
-
-            match possible_token {
-                Some(t) => {
-                    stream.push(t);
-                }
-                None => return Err(possible_error.unwrap()),
+    pub fn lex(self) -> Result<Vec<Token>, LexicalError> {
+        match self.mode {
+            LexerMode::DirectInput(v) => SourceMap::insert(SourceFile::from_string(v)?),
+            LexerMode::File(path) => {
+                SourceMap::insert(SourceFile::new(path)?);
             }
         }
 
-        Ok(stream)
+        let source_map = SourceMap::instance();
+
+        let mut tokens = vec![];
+        let mut input = source_map.get(0).unwrap().contents().trim();
+        let mut offset = 0;
+
+        while !input.is_empty() {
+            let unmapped = TokenType::lex(input);
+            let mut token_len = 0;
+
+            #[allow(unused_must_use)]
+            unmapped.as_ref().inspect(|(_, s)| {
+                token_len = input.len() - s.len();
+            });
+
+            let (token, rest) = unmapped.map_span(offset)?;
+            let rest = extract_whitespace(rest);
+            offset += input.len() - rest.len(); // advance offset
+            input = rest;
+            tokens.push(token);
+        }
+
+        Ok(tokens)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    #[macro_export]
-    macro_rules! token {
-        (id $id:tt) => {
-            $crate::lexer::tokens::Token::Identifier($crate::lexer::tokens::Identifier::new(
-                stringify!($id),
-            ))
-        };
-
-        (ls $ls:expr) => {
-            $crate::lexer::tokens::Token::Literal($crate::lexer::tokens::Literal::StringLiteral(
-                $ls.into(),
-            ))
-        };
-
-        (ln $ln:expr) => {
-            $crate::lexer::tokens::Token::Literal($crate::lexer::tokens::Literal::NumberLiteral(
-                stringify!($ln).to_owned(),
-            ))
-        };
-
-        (=) => {
-            $crate::lexer::tokens::Token::Assign($crate::lexer::tokens::Assign)
-        };
-
-        (;) => {
-            $crate::lexer::tokens::Token::Semicolon($crate::lexer::tokens::Semicolon)
-        };
-
-        (op $op:tt) => {
-            $crate::lexer::tokens::Token::Operation($crate::lexer::tokens::Operation::from_char(
-                stringify!($op).chars().next().unwrap(),
-            ))
-        };
-
-        (let) => {
-            $crate::lexer::tokens::Token::Keyword($crate::lexer::tokens::Keyword::Let)
-        };
-    }
+    use crate::{
+        lexer::{
+            INITIAL_FILE, Lexer,
+            identifier::Identifier,
+            keyword::Keyword,
+            literal::{Literal, NumberLiteral},
+            single::{Assign, Semicolon},
+            tokens::{Token, TokenType},
+        },
+        span::Span,
+    };
 
     #[test]
     fn lex() {
-        let s = "let f = 5 + 7;";
+        let x = "let x = 5;".to_owned();
+        let result = match Lexer::new(super::LexerMode::DirectInput(x)).lex() {
+            Ok(v) => v,
+            Err(e) => {
+                panic!("{e}");
+            }
+        };
 
-        assert_eq!(
-            Ok(vec![
-                token![let],
-                token![id f],
-                token![=],
-                token![ln 5],
-                token![op+],
-                token![ln 7],
-                token![;]
-            ]),
-            Lexer::lex(s)
-        );
+        let expected_tokens = &[
+            Token::new(
+                TokenType::Keyword(Keyword::Let),
+                Span::new(INITIAL_FILE, 0, 3),
+            ),
+            Token::new(
+                TokenType::Identifier(Identifier::new("x")),
+                Span::new(INITIAL_FILE, 4, 5),
+            ),
+            Token::new(TokenType::Assign(Assign), Span::new(INITIAL_FILE, 6, 7)),
+            Token::new(
+                TokenType::Literal(Literal::NumberLiteral(NumberLiteral("5".into()))),
+                Span::new(INITIAL_FILE, 8, 9),
+            ),
+            Token::new(
+                TokenType::Semicolon(Semicolon),
+                Span::new(INITIAL_FILE, 9, 10),
+            ),
+        ];
+
+        assert_eq!(&result, expected_tokens);
     }
 }
