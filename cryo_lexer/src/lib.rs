@@ -1,10 +1,8 @@
+use cryo_span::{LexResultExt, SourceFile, SourceFileError, SourceMap, Span};
 use thiserror::Error;
 use tokens::Token;
 
-use crate::{
-    lexer::tokens::TokenType,
-    span::{LexResultExt, SourceFile, SourceFileError, SourceMap, Span},
-};
+use crate::tokens::TokenType;
 
 pub mod identifier;
 pub mod keyword;
@@ -88,10 +86,8 @@ impl Lexer {
     #[allow(clippy::missing_panics_doc)]
     pub fn lex(self) -> Result<Vec<Token>, LexicalError> {
         match self.mode {
-            LexerMode::DirectInput(v) => SourceMap::insert(SourceFile::from_string(v)?),
-            LexerMode::File(path) => {
-                SourceMap::insert(SourceFile::new(path)?);
-            }
+            LexerMode::DirectInput(v) => SourceMap::push(SourceFile::from_string(v)?),
+            LexerMode::File(path) => SourceMap::push(SourceFile::new(path)?),
         }
 
         let source_map = SourceMap::instance();
@@ -122,16 +118,15 @@ impl Lexer {
 
 #[cfg(test)]
 mod tests {
+    use cryo_span::Span;
+
     use crate::{
-        lexer::{
-            INITIAL_FILE, Lexer,
-            identifier::Identifier,
-            keyword::Keyword,
-            literal::{Literal, NumberLiteral},
-            single::{Assign, Semicolon},
-            tokens::{Token, TokenType},
-        },
-        span::Span,
+        INITIAL_FILE, Lexer,
+        identifier::Identifier,
+        keyword::Keyword,
+        literal::{Literal, NumberLiteral},
+        single::{Assign, Semicolon},
+        tokens::{Token, TokenType},
     };
 
     #[test]

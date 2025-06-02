@@ -1,4 +1,4 @@
-use crate::span::Span;
+use cryo_span::{Span, impl_get_span};
 
 use super::{
     Lex,
@@ -54,6 +54,8 @@ pub struct Token {
     pub token: TokenType,
     pub span: Span,
 }
+
+impl_get_span!(Token, span);
 
 impl Token {
     #[must_use]

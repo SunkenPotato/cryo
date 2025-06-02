@@ -1,0 +1,9 @@
+[package]
+name = "cryo_lexer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cryo_span = { path = "../cryo_span" }
+internment = "0.8.6"
+thiserror = "2.0.12"

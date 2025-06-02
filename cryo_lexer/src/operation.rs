@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::span::Span;
+use cryo_span::Span;
 
 use super::{
     Lex,
@@ -32,7 +32,7 @@ impl FromStr for Operation {
 }
 
 impl Lex for Operation {
-    fn lex(input: &str) -> Result<(super::tokens::Token, &str), crate::span::Span> {
+    fn lex(input: &str) -> Result<(super::tokens::Token, &str), Span> {
         let op = Self::from_str(&input[..1])?;
         let token = Token::new(TokenType::Operation(op), Span::ONE);
 

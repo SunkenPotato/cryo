@@ -1,6 +1,5 @@
+use cryo_span::Span;
 use internment::Intern;
-
-use crate::span::Span;
 
 use super::{INITIAL_FILE, Lex, extract, tokens::Token};
 
@@ -14,7 +13,7 @@ impl Identifier {
 }
 
 impl Lex for Identifier {
-    fn lex(input: &str) -> Result<(super::tokens::Token, &str), crate::span::Span> {
+    fn lex(input: &str) -> Result<(Token, &str), Span> {
         let (id, rest) = extract(input, |c| !c.is_ascii_alphanumeric());
 
         if id.is_empty() {

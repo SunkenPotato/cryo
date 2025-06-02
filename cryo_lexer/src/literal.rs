@@ -1,4 +1,4 @@
-use crate::span::Span;
+use cryo_span::Span;
 
 use super::{
     INITIAL_FILE, Lex, extract, tag,
@@ -29,7 +29,7 @@ impl Lex for Literal {
 pub struct StringLiteral(pub String);
 
 impl Lex for StringLiteral {
-    fn lex(input: &str) -> Result<(super::tokens::Token, &str), crate::span::Span> {
+    fn lex(input: &str) -> Result<(super::tokens::Token, &str), Span> {
         let Some(rest) = tag("\"", input) else {
             return Err(Span::ONE);
         };
@@ -92,7 +92,7 @@ impl Lex for NumberLiteral {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::{Lex, literal::Literal, tokens::TokenType};
+    use crate::{Lex, literal::Literal, tokens::TokenType};
 
     use super::StringLiteral;
 

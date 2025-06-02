@@ -1,4 +1,4 @@
-use crate::span::Span;
+use cryo_span::Span;
 
 use super::{
     INITIAL_FILE, Lex, tag,
@@ -37,7 +37,7 @@ keyword! {
 }
 
 impl Lex for Keyword {
-    fn lex(input: &str) -> Result<(super::tokens::Token, &str), crate::span::Span> {
+    fn lex(input: &str) -> Result<(super::tokens::Token, &str), Span> {
         for variant in Self::VARIANTS {
             let s = variant.get();
             let span = Span::new(INITIAL_FILE, 0, s.len());
