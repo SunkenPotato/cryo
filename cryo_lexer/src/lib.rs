@@ -86,7 +86,7 @@ impl Lexer {
     #[allow(clippy::missing_panics_doc)]
     pub fn lex(self) -> Result<Vec<Token>, LexicalError> {
         match self.mode {
-            LexerMode::DirectInput(v) => SourceMap::push(SourceFile::from_string(v)?),
+            LexerMode::DirectInput(v) => SourceMap::push(SourceFile::from_string(v, None)?),
             LexerMode::File(path) => SourceMap::push(SourceFile::new(path)?),
         }
 
