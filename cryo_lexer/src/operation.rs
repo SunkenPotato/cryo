@@ -1,3 +1,6 @@
+//! Arithmetic operators.
+//!
+//! View [`Operation`] for more info.
 use std::str::FromStr;
 
 use cryo_span::Span;
@@ -7,12 +10,18 @@ use super::{
     tokens::{Token, TokenType},
 };
 
+/// An arithmetic operator.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
+    /// The addition operator, `+`.
     Add,
+    /// The subtraction operator, '-'.
     Sub,
+    /// The multiplication operator, '*'.
     Mul,
+    /// The division operator '/'.
     Div,
+    /// The remainder operator, `%`.
     Rem,
 }
 

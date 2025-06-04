@@ -1,9 +1,13 @@
+//! Tokens consisting of single characters, such as ';' (semicolon).
+
 macro_rules! single_token {
-    ($name:ident, $c:literal) => {
+    ($name:ident, $c:literal, $doc:expr) => {
         #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+        #[doc = $doc]
         pub struct $name;
 
         impl $name {
+            /// The string representation of this struct.
             pub const TOKEN: &str = $c;
         }
 
@@ -22,5 +26,13 @@ macro_rules! single_token {
     };
 }
 
-single_token!(Assign, "=");
-single_token!(Semicolon, ";");
+single_token!(
+    Assign,
+    "=",
+    "The assign token. Used in bindings or reassignments."
+);
+single_token!(
+    Semicolon,
+    ";",
+    "The semicolon token. Used to end statements."
+);

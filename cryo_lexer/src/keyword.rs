@@ -1,3 +1,7 @@
+//! Keywords in the cryo language.
+//!
+//! Keywords are reserved tokens that have no meaning but to hint at certain token compositions, such as `let` for bindings and `fn` for functions.
+
 use cryo_span::Span;
 
 use super::{
@@ -7,18 +11,22 @@ use super::{
 
 macro_rules! keyword {
     ($($variant:ident = $val:expr),*) => {
+        /// A keyword. View the module-level docs for more info.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         pub enum Keyword {
             $(
+                #[doc = concat!("The `", $val, "` keyword")]
                 $variant,
             )*
         }
 
         impl Keyword {
+            /// All the enum variants / keywords.
             pub const VARIANTS: &[Self] = &[
                 $(Self::$variant,)*
             ];
 
+            /// Get the string slice that this keyword is.
             #[must_use]
             pub const fn get(&self) -> &str {
                 match self {

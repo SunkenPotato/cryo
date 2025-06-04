@@ -1,4 +1,12 @@
-use cryo_span::{LexResultExt, SourceFile, SourceFileError, SourceMap, Span};
+//! This crate provides the lexer and tokens for the cryo language.
+//!
+//! In particular, this crate works primarily with the [`Lexer`] and [`Token`] structs to parse inputs into a computer-understandable form.
+//!
+//! Core components: [`Lexer`], [`Token`].
+
+#![deny(missing_docs)]
+
+use cryo_span::{INITIAL_FILE, LexResultExt, SourceFile, SourceFileError, SourceMap, Span};
 use thiserror::Error;
 use tokens::Token;
 
@@ -11,23 +19,43 @@ pub mod operation;
 pub mod single;
 pub mod tokens;
 
-/// The file index to use with spans, since there multiple files are not supported yet.
-pub const INITIAL_FILE: usize = 0;
-
+/// Parse a string slice into a [`Token`].
+///
+/// This trait is by no means necessary yet, however, to avoid breaking changes in libraries that depend on a such trait and cohesiveness, this trait defines
+/// the method a certain `Token` should be parsed.
 pub trait Lex: Sized {
-    /// Parse a string into a token.
+    /// Parse a string into a token. This function *should* consume the string it has read and lexed, and return a string slice that does not contain the aforementioned.
     ///
     /// Assumes whitespace has already been stripped.
     /// # Errors
-    /// The `Span` returned is the erroneous section.
+    /// The `Span` returned is the erroneous section in `input`.
     fn lex(input: &str) -> Result<(Token, &str), Span>;
 }
 
+/// "tag", or remove a prefix from a string slice.
+///
+/// # Examples
+/// ```rust
+/// use cryo_lexer::tag;
+///
+/// let pat = "H";
+/// let in = "Hello, world";
+/// assert_eq!(tag(pat, in), Some("ello, world"))
+/// ```
 #[must_use]
 pub fn tag<'s>(pat: &str, s: &'s str) -> Option<&'s str> {
     s.strip_prefix(pat)
 }
 
+/// Extract a slice from another string slice where a condition does not match.
+///
+/// # Examples
+/// ```rust
+/// let input = "Hello, world";
+/// let (extracted, rest) = extract(input, |c| !c.is_ascii_whitespace());
+/// assert_eq!(extracted, "Hello,");
+/// assert_eq!(rest, " world");
+/// ```
 pub fn extract(s: &str, f: fn(char) -> bool) -> (&str, &str) {
     let end = s
         .char_indices()
@@ -37,6 +65,9 @@ pub fn extract(s: &str, f: fn(char) -> bool) -> (&str, &str) {
     (&s[..end], &s[end..])
 }
 
+/// Convenience method for extracting the whitespace from a string.
+///
+/// View [`extract`] for more details.
 #[must_use]
 pub fn extract_whitespace(s: &str) -> &str {
     extract(s, |b| !b.is_ascii_whitespace()).1
@@ -46,17 +77,27 @@ pub fn extract_whitespace(s: &str) -> &str {
 ///
 /// The lexer can either read a direct `String` or the contents of a `File`.
 pub enum LexerMode {
+    /// Read directly from a [`String`]. The file used will be called "<unnamed>"
     DirectInput(String),
+    /// Read from a file. The inner string is the path where this file lies.
     File(String),
 }
 
+/// The lexer struct.
+///
+/// This struct is responsible for turning a string input into a stream of tokens, and can be created using the [`Lexer::new`] method.
+///
+/// View [`Lexer::lex`] for more information on the lexing process.
 pub struct Lexer {
     mode: LexerMode,
 }
 
+/// The different errors a [`Lexer`] can encounter while trying to lex the provided input.
 #[derive(Error, Debug)]
 pub enum LexicalError {
+    /// A problem occurred while trying to read the input.
     SourceFileError(#[from] SourceFileError),
+    /// The provided input is invalid and therefore cannot be lexed. The [`Span`] points to the problematic code.
     ProblematicSpan(#[from] Span),
 }
 
@@ -78,12 +119,15 @@ impl std::fmt::Display for LexicalError {
 }
 
 impl Lexer {
+    /// Create a new [`Lexer`] with the given [`LexerMode`]
     #[must_use]
     pub const fn new(mode: LexerMode) -> Self {
         Self { mode }
     }
 
-    #[allow(clippy::missing_panics_doc)]
+    /// The whole point.
+    ///
+    /// This method will try to parse the input it was given when it was constructed.
     pub fn lex(self) -> Result<Vec<Token>, LexicalError> {
         match self.mode {
             LexerMode::DirectInput(v) => SourceMap::push(SourceFile::from_string(v, None)?),
@@ -93,6 +137,7 @@ impl Lexer {
         let source_map = SourceMap::instance();
 
         let mut tokens = vec![];
+        #[allow(clippy::missing_panics_doc)]
         let mut input = source_map.get(0).unwrap().contents().trim();
         let mut offset = 0;
 

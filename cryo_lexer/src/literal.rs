@@ -1,3 +1,9 @@
+//! Number and string literals.
+//!
+//! A literal is a direct, constant value that can be evaluated without any further computation.
+//!
+//! For the precise definition of each type, view [`StringLiteral`] and [`NumberLiteral`] respectively.
+
 use cryo_span::Span;
 
 use super::{
@@ -5,9 +11,14 @@ use super::{
     tokens::{Token, TokenType},
 };
 
+/// A direct, constant-time defined value that can be evaluated without any further computation.
+///
+/// This enum can be either a [`StringLiteral`] or a [`NumberLiteral`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal {
+    /// A [`StringLiteral`].
     StringLiteral(StringLiteral),
+    /// A [`NumberLiteral`]
     NumberLiteral(NumberLiteral),
 }
 
@@ -25,6 +36,10 @@ impl Lex for Literal {
     }
 }
 
+/// A string literal.
+///
+/// A string literal is defined as a token starting with a `"` and ending with a `"`. \
+/// String literals support escaped characters, however, they are not evaluated by the parser, but rather by the lexer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StringLiteral(pub String);
 
@@ -70,6 +85,11 @@ impl Lex for StringLiteral {
     }
 }
 
+/// A number literal.
+///
+/// This struct represents an unparsed integer.
+///
+/// Number literals may contain `_` between digits for clearer distinction and are otherwise only allowed the characters `0-9`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumberLiteral(pub String);
 

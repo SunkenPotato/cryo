@@ -1,12 +1,24 @@
+//! The [`Identifier`] token.
+//!
+//! View [`Identifier`] for more info.
+
 use cryo_span::Span;
 use internment::Intern;
 
 use super::{INITIAL_FILE, Lex, extract, tokens::Token};
 
+/// Represents the identifier in code. An identifier must match the following regex to be considered valid:
+/// ```
+/// [^0-9][0-9a-zA-Z_]*
+/// ```
+/// An identifier is not encapsulated in `""`.
+///
+/// [`Identifier`]s are stored as interned [`String`]s, making them `Copy` and cheap to compare and hash.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Identifier(pub Intern<String>);
 
 impl Identifier {
+    /// Construct a new [`Identifier`] from a string.
     pub fn new(s: impl Into<String>) -> Self {
         Self(Intern::new(s.into()))
     }

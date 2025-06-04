@@ -92,6 +92,7 @@ impl Span {
     /// let span = Span::new(INITIAL_FILE, 0, 1);
     ///
     /// assert_eq!(span.slice(), "")
+    #[must_use]
     pub fn slice(&self) -> String {
         let map = SourceMap::instance();
         let Some(file) = map.files.get(self.file) else {
