@@ -1,0 +1,7 @@
+[package]
+name = "cryo_parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cryo_lexer = { version = "0.1.0", path = "../cryo_lexer" }
