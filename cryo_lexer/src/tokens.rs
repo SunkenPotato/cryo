@@ -1,5 +1,7 @@
 //! Tokens created by the lexer.
 
+use std::any::Any;
+
 use cryo_span::{Span, impl_get_span};
 
 use super::{
@@ -31,7 +33,7 @@ pub enum TokenType {
 }
 
 impl TokenType {
-    const LEX_FUNCTIONS: &'static [LexFunction] = &[
+    const LEX_FUNCTIONS: &[LexFunction] = &[
         Keyword::lex,
         Identifier::lex,
         Literal::lex,
@@ -39,6 +41,51 @@ impl TokenType {
         Operation::lex,
         Semicolon::lex,
     ];
+
+    /// Require the inner value to be of `T`, and return it as a reference or return `None`.
+    pub fn require_ref<T: 'static>(&self) -> Option<&T> {
+        self.as_any_ref().downcast_ref()
+    }
+
+    /// Require the inner value of the current enum variant to be of `T` and return it, or else return `self`.
+    pub fn require<T: 'static>(self) -> Result<T, Self> {
+        let any_ref = self.as_any_ref();
+
+        if !any_ref.is::<T>() {
+            return Err(self);
+        }
+
+        *self.as_any().downcast().expect("should not be on fire")
+    }
+
+    /// Get the inner value of the current enum variant as [`std::any::Any`].
+    pub fn as_any_ref(&self) -> &dyn Any {
+        use self::TokenType::*;
+
+        match self {
+            Keyword(v) => v,
+            Identifier(v) => v,
+            Literal(v) => v,
+            Assign(v) => v,
+            Operation(v) => v,
+            Semicolon(v) => v,
+        }
+    }
+
+    /// Consume `self` and get the inner value of the current enum variant as [`Any`].
+    ///
+    /// This method is *not* the same as `Box::new(self)`.
+    pub fn as_any(self) -> Box<dyn Any> {
+        use self::TokenType::*;
+        match self {
+            Keyword(v) => Box::new(v),
+            Identifier(v) => Box::new(v),
+            Literal(v) => Box::new(v),
+            Assign(v) => Box::new(v),
+            Operation(v) => Box::new(v),
+            Semicolon(v) => Box::new(v),
+        }
+    }
 }
 
 impl Lex for TokenType {
@@ -76,5 +123,21 @@ impl Token {
     #[must_use]
     pub const fn new(token: TokenType, span: Span) -> Self {
         Self { token, span }
+    }
+
+    /// Require the `token` field to have an inner type of `T` and return `&T` or return `None`.
+    pub fn require_ref<T: 'static>(&self) -> Option<&T> {
+        self.token.require_ref::<T>()
+    }
+
+    /// Require the `token` field to have an inner type of `T` and return and owned value or return `Err(self)`.
+    pub fn require<T: 'static>(self) -> Result<T, Self> {
+        match self.token.require() {
+            Ok(v) => Ok(v),
+            Err(token) => Err(Self {
+                token,
+                span: self.span,
+            }),
+        }
     }
 }

@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 cryo_lexer = { version = "0.1.0", path = "../cryo_lexer" }
+cryo_span = { version = "0.1.0", path = "../cryo_span" }

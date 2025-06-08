@@ -6,6 +6,8 @@
 //! - binding references
 //! - arithmetic expressions
 
+use crate::Parse;
+
 /// A literal expression.
 ///
 /// A [`Literal`] can be any of the following:
@@ -24,6 +26,12 @@ pub enum Literal {
 ///
 /// This literal has the same constraints as an [`i32`], since it is represented by an `i32`.
 pub struct NumberLiteral(pub i32);
+
+impl Parse for NumberLiteral {
+    fn parse(stream: &mut crate::TokenStream) -> Result<Self, crate::ParseError> {
+        let token = stream.peek()
+    }
+}
 
 /// An escaped string literal.
 ///
