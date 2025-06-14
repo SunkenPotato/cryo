@@ -19,6 +19,8 @@ pub mod operation;
 pub mod single;
 pub mod tokens;
 
+static WHITESPACE: &[char] = &['\u{20}', '\u{0A}', '\u{0D}'];
+
 /// Parse a string slice into a [`Token`].
 ///
 /// This trait is by no means necessary yet, however, to avoid breaking changes in libraries that depend on a such trait and cohesiveness, this trait defines
@@ -70,7 +72,7 @@ pub fn extract(s: &str, f: fn(char) -> bool) -> (&str, &str) {
 /// View [`extract`] for more details.
 #[must_use]
 pub fn extract_whitespace(s: &str) -> &str {
-    extract(s, |b| !b.is_ascii_whitespace()).1
+    extract(s, |b| WHITESPACE.contains(&b)).1
 }
 
 /// Represents the lexer mode.

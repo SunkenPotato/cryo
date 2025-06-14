@@ -9,7 +9,7 @@ use super::{INITIAL_FILE, Lex, extract, tokens::Token};
 
 /// Represents the identifier in code. An identifier must match the following regex to be considered valid:
 /// ```
-/// [^0-9][0-9a-zA-Z_]*
+/// [a-zA-Z_][0-9a-zA-Z_]*
 /// ```
 /// An identifier is not encapsulated in `""`.
 ///

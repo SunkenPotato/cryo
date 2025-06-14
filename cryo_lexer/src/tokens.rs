@@ -17,6 +17,7 @@ type LexFunction = fn(&str) -> Result<(Token, &str), Span>;
 
 /// The different types a token can be.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[repr(u16)]
 pub enum TokenType {
     /// The [`Keyword`] token.
     Keyword(Keyword),
@@ -43,19 +44,25 @@ impl TokenType {
     ];
 
     /// Require the inner value to be of `T`, and return it as a reference or return `None`.
-    pub fn require_ref<T: 'static>(&self) -> Option<&T> {
+    pub fn require_ref<T: 'static + TokenGroup>(&self) -> Option<&T> {
         self.as_any_ref().downcast_ref()
     }
 
     /// Require the inner value of the current enum variant to be of `T` and return it, or else return `self`.
-    pub fn require<T: 'static>(self) -> Result<T, Self> {
+    pub fn require<T: 'static + TokenGroup>(self) -> Result<T, Self> {
+        dbg!(core::any::type_name::<T>());
+        dbg!(&self);
         let any_ref = self.as_any_ref();
 
         if !any_ref.is::<T>() {
             return Err(self);
         }
 
-        *self.as_any().downcast().expect("should not be on fire")
+        let result = self.as_any().downcast::<T>();
+
+        result
+            .map(|v| *v)
+            .map_err(|_| unsafe { core::hint::unreachable_unchecked() })
     }
 
     /// Get the inner value of the current enum variant as [`std::any::Any`].
@@ -84,6 +91,23 @@ impl TokenType {
             Assign(v) => Box::new(v),
             Operation(v) => Box::new(v),
             Semicolon(v) => Box::new(v),
+        }
+    }
+
+    /// Check if the current token is of `T`.
+    pub fn is<T: 'static>(&self) -> bool {
+        self.as_any_ref().is::<T>()
+    }
+
+    /// Retrieve the name of this variant as specified by [`TokenGroup`].
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::Keyword(_) => Keyword::NAME,
+            Self::Identifier(_) => Identifier::NAME,
+            Self::Literal(_) => Literal::NAME,
+            Self::Assign(_) => Assign::NAME,
+            Self::Operation(_) => Operation::NAME,
+            Self::Semicolon(_) => Semicolon::NAME,
         }
     }
 }
@@ -126,12 +150,12 @@ impl Token {
     }
 
     /// Require the `token` field to have an inner type of `T` and return `&T` or return `None`.
-    pub fn require_ref<T: 'static>(&self) -> Option<&T> {
+    pub fn require_ref<T: 'static + TokenGroup>(&self) -> Option<&T> {
         self.token.require_ref::<T>()
     }
 
     /// Require the `token` field to have an inner type of `T` and return and owned value or return `Err(self)`.
-    pub fn require<T: 'static>(self) -> Result<T, Self> {
+    pub fn require<T: 'static + TokenGroup>(self) -> Result<T, Self> {
         match self.token.require() {
             Ok(v) => Ok(v),
             Err(token) => Err(Self {
@@ -140,4 +164,35 @@ impl Token {
             }),
         }
     }
+
+    /// Check if the current token is of type `T`.
+    pub fn is<T: 'static>(&self) -> bool {
+        self.token.is::<T>()
+    }
+
+    /// See [`Token::name`].
+    pub const fn name(&self) -> &'static str {
+        self.token.name()
+    }
 }
+
+trait Sealed {}
+/// A marker trait for all types a [`TokenType`] can contain.
+#[allow(private_bounds)]
+pub trait TokenGroup: Sealed {
+    /// Return the name of this lexeme, used for formatting and errors.
+    const NAME: &'static str;
+}
+
+macro_rules! impl_tg {
+    ($($t:ty),*) => {
+        $(
+            impl Sealed for $t {}
+            impl TokenGroup for $t {
+                const NAME: &'static str = stringify!($t);
+            }
+        )*
+    }
+}
+
+impl_tg![Keyword, Identifier, Literal, Assign, Operation, Semicolon];

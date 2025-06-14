@@ -4,6 +4,11 @@
 
 use cryo_span::Span;
 
+/// The `let` keyword.
+pub const KW_LET: &str = "let";
+/// The `mut` keyword.
+pub const KW_MUT: &str = "mut";
+
 use super::{
     INITIAL_FILE, Lex, tag,
     tokens::{Token, TokenType},
@@ -15,7 +20,7 @@ macro_rules! keyword {
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         pub enum Keyword {
             $(
-                #[doc = concat!("The `", $val, "` keyword")]
+                #[allow(missing_docs)]
                 $variant,
             )*
         }
@@ -40,8 +45,8 @@ macro_rules! keyword {
 }
 
 keyword! {
-    Let = "let",
-    Mut = "mut"
+    Let = KW_LET,
+    Mut = KW_MUT
 }
 
 impl Lex for Keyword {
