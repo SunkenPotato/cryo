@@ -15,7 +15,7 @@ use super::{
 };
 
 macro_rules! keyword {
-    ($($variant:ident = $val:expr),*) => {
+    ($($variant:ident = $val:tt),*) => {
         /// A keyword. View the module-level docs for more info.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         pub enum Keyword {
@@ -38,6 +38,20 @@ macro_rules! keyword {
                     $(
                         Self::$variant => $val,
                     )*
+                }
+            }
+        }
+
+        impl std::str::FromStr for Keyword {
+            type Err = ();
+
+            /// Attempt to create a variant from a string slice.
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $(
+                        $val => Ok(Self::$variant),
+                    )*
+                    _ => Err(())
                 }
             }
         }

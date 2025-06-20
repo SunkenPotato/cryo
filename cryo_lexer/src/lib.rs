@@ -38,23 +38,23 @@ pub trait Lex: Sized {
 ///
 /// # Examples
 /// ```rust
-/// use cryo_lexer::tag;
-///
-/// let pat = "H";
-/// let in = "Hello, world";
-/// assert_eq!(tag(pat, in), Some("ello, world"))
+/// let pat: &str = "H";
+/// let input: &str = "Hello, world";
+/// assert_eq!(cryo_lexer::tag(pat, input), Some("ello, world"))
 /// ```
 #[must_use]
 pub fn tag<'s>(pat: &str, s: &'s str) -> Option<&'s str> {
     s.strip_prefix(pat)
 }
 
-/// Extract a slice from another string slice where a condition does not match.
+/// Extract a slice from another string slice while a condition does not match.
 ///
 /// # Examples
 /// ```rust
+/// use cryo_lexer::extract;
+///
 /// let input = "Hello, world";
-/// let (extracted, rest) = extract(input, |c| !c.is_ascii_whitespace());
+/// let (extracted, rest) = extract(input, |c| c.is_ascii_whitespace());
 /// assert_eq!(extracted, "Hello,");
 /// assert_eq!(rest, " world");
 /// ```
@@ -72,7 +72,7 @@ pub fn extract(s: &str, f: fn(char) -> bool) -> (&str, &str) {
 /// View [`extract`] for more details.
 #[must_use]
 pub fn extract_whitespace(s: &str) -> &str {
-    extract(s, |b| WHITESPACE.contains(&b)).1
+    extract(s, |b| !WHITESPACE.contains(&b)).1
 }
 
 /// Represents the lexer mode.
@@ -154,13 +154,110 @@ impl Lexer {
 
             let (token, rest) = unmapped.map_span(offset)?;
             let rest = extract_whitespace(rest);
-            offset += input.len() - rest.len(); // advance offset
+            offset += input.len() - rest.len();
+            dbg!(rest);
             input = rest;
             tokens.push(token);
         }
 
         Ok(tokens)
     }
+}
+
+#[macro_export]
+#[allow(missing_docs)]
+macro_rules! t {
+    (id $id:literal) => {{
+        use $crate::{
+            identifier::Identifier,
+            tokens::{Token, TokenType},
+        };
+
+        use cryo_span::Span;
+
+        Token::new(TokenType::Identifier(Identifier::new($id)), Span::EMPTY)
+    }};
+
+    (keyword $kw:literal) => {{
+        use $crate::{
+            keyword::Keyword,
+            tokens::{Token, TokenType},
+        };
+
+        use cryo_span::Span;
+
+        Token::new(
+            TokenType::Keyword(Keyword::from_str($kw).unwrap()),
+            Span::EMPTY,
+        )
+    }};
+
+    (nl $nl:literal) => {{
+        use $crate::{
+            literal::{Literal, NumberLiteral},
+            tokens::{Token, TokenType},
+        };
+
+        use cryo_span::Span;
+
+        Token::new(
+            TokenType::Literal(Literal::NumberLiteral(NumberLiteral(
+                stringify!($nl).to_owned(),
+            ))),
+            Span::EMPTY,
+        )
+    }};
+
+    (sl $sl:literal) => {{
+        use $crate::{
+            literal::{Literal, NumberLiteral},
+            tokens::{Token, TokenType},
+        };
+
+        use cryo_span::Span;
+
+        Token::new(
+            TokenType::Literal(Literal::StringLiteral(StringLiteral($nl.to_owned()))),
+            Span::EMPTY,
+        )
+    }};
+
+    (op $op:tt) => {{
+        use std::str::FromStr;
+        use $crate::{
+            operation::Operation,
+            tokens::{Token, TokenType},
+        };
+
+        use cryo_span::Span;
+
+        Token::new(
+            TokenType::Operation(Operation::from_str(stringify!($op)).unwrap()),
+            Span::EMPTY,
+        )
+    }};
+
+    (=) => {{
+        use $crate::{
+            single::Assign,
+            tokens::{Token, TokenType},
+        };
+
+        use cryo_span::Span;
+
+        Token::new(TokenType::Assign(Assign), Span::EMPTY)
+    }};
+
+    (;) => {{
+        use $crate::{
+            single::Semicolon,
+            token::{Token, TokenType},
+        };
+
+        use cryo_span::Span;
+
+        Token::new(TokenType::Semicolon(Semicolon), Span::EMPTY)
+    }};
 }
 
 #[cfg(test)]

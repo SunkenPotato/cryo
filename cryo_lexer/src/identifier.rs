@@ -8,7 +8,7 @@ use internment::Intern;
 use super::{INITIAL_FILE, Lex, extract, tokens::Token};
 
 /// Represents the identifier in code. An identifier must match the following regex to be considered valid:
-/// ```
+/// ```compile_fail
 /// [a-zA-Z_][0-9a-zA-Z_]*
 /// ```
 /// An identifier is not encapsulated in `""`.
