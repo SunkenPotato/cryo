@@ -7,6 +7,8 @@
 #![deny(missing_docs)]
 #![warn(rustdoc::missing_doc_code_examples)]
 
+use std::borrow::Cow;
+
 use thiserror::Error;
 
 mod source;
@@ -44,7 +46,7 @@ pub const INITIAL_FILE: usize = 0;
 /// <unnamed>:0:10
 /// Hello
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Error)]
 pub struct Span {
     file: usize,
     start: usize,
@@ -92,23 +94,27 @@ impl Span {
     /// let span = Span::new(INITIAL_FILE, 0, 1);
     ///
     /// assert_eq!(span.slice(), "")
+    ///
     #[must_use]
-    pub fn slice(&self) -> String {
+    pub fn slice<'a>(&'a self) -> String {
         let map = SourceMap::instance();
         let Some(file) = map.files.get(self.file) else {
             return String::new();
         };
 
-        file.contents[self.start..=self.stop].to_string()
+        file.slice(self.start, self.stop).unwrap().into_owned()
     }
 
-    fn file_name(&self) -> String {
+    fn file_name(&self) -> Cow<'_, str> {
         let map = SourceMap::instance();
         let Some(file) = map.files.get(self.file) else {
-            return String::from("<unknown file>");
+            return Cow::Borrowed("<unknown file>");
         };
 
-        file.file.clone()
+        match &file.file {
+            SourceFileLocation::Fs(path) => Cow::Owned(path.to_string_lossy().into_owned()),
+            SourceFileLocation::Direct(_) => Cow::Borrowed("<unnamed file>"),
+        }
     }
 
     /// Construct a new [`Span`].
@@ -116,10 +122,10 @@ impl Span {
     /// For the non-panicking version, view [`new_safe`](Self::new_safe).
     /// # Examples
     /// ```rust
-    /// use cryo_span::{Span, SourceFile, SourceMap, INITIAL_FILE};
+    /// use cryo_span::{Span, SourceFile, SourceFileInput, SourceMap, INITIAL_FILE};
     ///
     /// let input = "Hello, world";
-    /// SourceMap::push(SourceFile::from_string(input.to_owned(), None).unwrap());
+    /// SourceMap::push(SourceFile::from_string(SourceFileInput::Direct(input.to_owned())).unwrap());
     /// let span = Span::new(INITIAL_FILE, 0, 4); // points to: "Hello"
     ///
     /// assert_eq!(span.slice(), "Hello".to_string());
