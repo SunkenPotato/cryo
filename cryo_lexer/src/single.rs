@@ -2,7 +2,7 @@
 
 macro_rules! single_token {
     ($name:ident, $c:literal, $doc:expr) => {
-        #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+        #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash)]
         #[doc = $doc]
         pub struct $name;
 

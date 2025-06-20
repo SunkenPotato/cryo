@@ -5,7 +5,7 @@
 use cryo_lexer::operation::Operation as OpToken;
 
 use crate::{
-    Parse,
+    Parse, Spanned, SpecToken,
     error::ParseError,
     expr::{Expr, ReducedExpr},
 };
@@ -27,21 +27,18 @@ pub struct MathExpr {
 
 impl Parse for MathExpr {
     #[track_caller]
-    fn parse(stream: &mut crate::TokenStream) -> Result<Self, Box<dyn ParseError>> {
-        println!("d");
-        let lhs = match ReducedExpr::parse(stream) {
-            Ok(v) => Expr::ReducedExpr(v),
+    fn parse(stream: &mut crate::TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>> {
+        let Spanned(lhs, lspan) = match ReducedExpr::parse(stream) {
+            Ok(v) => v.map(Expr::ReducedExpr),
             Err(e) => return Err(e),
         };
-        println!("c");
 
-        let op = Operator::parse(stream)?;
-        println!("b");
-        let rhs = Expr::parse(stream)?;
+        let Spanned(op, op_span) = Operator::parse(stream)?;
+        let Spanned(rhs, rspan) = Expr::parse(stream)?;
 
-        println!("a");
+        let span = lspan.extend(op_span).extend(rspan);
 
-        Ok(Self { lhs, op, rhs })
+        Ok(Spanned(Self { lhs, op, rhs }, span))
     }
 }
 
@@ -73,13 +70,13 @@ impl From<OpToken> for Operator {
 }
 
 impl Parse for Operator {
-    fn parse(stream: &mut crate::TokenStream) -> Result<Self, Box<dyn ParseError>> {
-        let token = stream.advance_require::<OpToken>()?;
-        let inner = *token.token;
+    fn parse(stream: &mut crate::TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>> {
+        let SpecToken { token, span } = stream.advance_require::<OpToken>()?;
+        let token = *token;
 
         stream.sync();
 
-        Ok((inner).into())
+        Ok(Spanned(token.into(), span))
     }
 }
 
@@ -88,37 +85,37 @@ mod tests {
     use cryo_lexer::t;
 
     use crate::{
-        Parse, TokenStream,
+        TokenStream,
         expr::{
             Expr, ReducedExpr,
             literal::{Literal, NumberLiteral},
             math_expr::{MathExpr, Operator},
         },
+        parse_assert,
     };
 
     #[test]
     fn parse_op() {
         let mut ts = TokenStream::new([t![op+]]);
 
-        assert_eq!(Operator::parse(&mut ts), Ok(Operator::Add));
-        assert!(ts.container.is_empty())
+        parse_assert(&mut ts, Operator::Add);
     }
 
     #[test]
     fn parse_math_expr() {
         let mut ts = TokenStream::new([t![nl 5], t![op+], t![nl 5]]);
 
-        assert_eq!(
-            MathExpr::parse(&mut ts),
-            Ok(MathExpr {
+        parse_assert(
+            &mut ts,
+            MathExpr {
                 lhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::NumberLiteral(
-                    NumberLiteral(5)
+                    NumberLiteral(5),
                 ))),
                 op: Operator::Add,
                 rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::NumberLiteral(
-                    NumberLiteral(5)
-                )))
-            })
+                    NumberLiteral(5),
+                ))),
+            },
         )
     }
 }

@@ -15,12 +15,15 @@ pub mod expr;
 use cryo_lexer::tokens::{Token, TokenGroup};
 use cryo_span::Span;
 
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    ops::{Deref, DerefMut},
+};
 
 use crate::error::{GenericError, ParseError, SpannedGenericError};
 
 /// A newtype wrapper around a [`VecDeque`] for parse operations.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct TokenStream {
     commands: usize,
     container: VecDeque<Token>,
@@ -101,6 +104,41 @@ impl TokenStream {
     }
 }
 
+/// A parser production with a [`Span`].
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct Spanned<T>(pub T, pub Span);
+
+impl<T> Spanned<T> {
+    /// Map a `Spanned<T>` into a `Spanned<U>` with the given closure.
+    pub fn map<F, U>(self, f: F) -> Spanned<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        Spanned(f(self.0), self.1)
+    }
+
+    /// Extend the current span with another span.
+    ///
+    /// View [`Span::extend`] for more information.
+    pub fn extend<U>(&mut self, other: Spanned<U>) {
+        self.1 = self.1.extend(other.1)
+    }
+}
+
+impl<T> Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for Spanned<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// Trait for parsing operations.
 ///
 /// Every type implementing this should be able to define and create itself from a
@@ -110,7 +148,42 @@ pub trait Parse: Sized {
     ///
     /// # Errors
     /// The error depends on the implementation of the trait.
-    fn parse(stream: &mut TokenStream) -> Result<Self, Box<dyn ParseError>>;
+    fn parse(stream: &mut TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>>;
+}
+
+/// Assert a parser production matches the given one, as well as that the stream has been entirely consumed.
+#[cfg(test)]
+#[track_caller]
+pub fn parse_assert<T: Parse + std::fmt::Debug + PartialEq>(stream: &mut TokenStream, expect: T) {
+    match T::parse(stream) {
+        Ok(Spanned(token, _)) => assert_eq!(expect, token),
+        Err(e) => panic!("{e}"),
+    }
+
+    assert!(stream.container.is_empty());
+}
+
+/// Assert that a given type fails to parse the stream, as well as that the stream has not been consumed.
+#[cfg(test)]
+#[track_caller]
+pub fn parse_assert_err<T, E>(stream: &mut TokenStream, err: E)
+where
+    T: Parse + std::fmt::Debug,
+    E: std::fmt::Debug,
+    dyn ParseError: PartialEq<E>,
+{
+    use std::panic::Location;
+
+    let len = stream.container.len();
+
+    match T::parse(stream) {
+        Ok(v) => panic!("test at {} should have failed: {v:#?}", Location::caller()),
+        Err(e) => assert!(*e == err),
+    };
+
+    let len2 = stream.container.len();
+
+    assert_eq!(len, len2);
 }
 
 /// Parses a list of tokens into an AST.

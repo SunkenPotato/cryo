@@ -1,10 +1,10 @@
 //! Binding references.
 //!
-//! Binding references represent the value they point to when evaluated.
+//! Binding references represent the value they point to when evaluated. \
 //! As such, they are an expression.
 use cryo_lexer::identifier::Identifier;
 
-use crate::{Parse, SpecToken};
+use crate::{Parse, Spanned, SpecToken};
 use cryo_lexer::identifier::Identifier as IToken;
 
 /// A reference to a binding.
@@ -12,9 +12,13 @@ use cryo_lexer::identifier::Identifier as IToken;
 pub struct BindingRef(pub Identifier);
 
 impl Parse for BindingRef {
-    fn parse(stream: &mut crate::TokenStream) -> Result<Self, Box<dyn crate::error::ParseError>> {
+    fn parse(
+        stream: &mut crate::TokenStream,
+    ) -> Result<Spanned<Self>, Box<dyn crate::error::ParseError>> {
         let SpecToken { token, span } = stream.advance_require::<IToken>()?;
-        Ok(Self(*token))
+        let token = *token;
+        stream.sync();
+        Ok(Spanned(Self(token), span))
     }
 }
 
@@ -22,15 +26,12 @@ impl Parse for BindingRef {
 mod tests {
     use cryo_lexer::{identifier::Identifier, t};
 
-    use crate::{Parse, TokenStream, expr::binding_ref::BindingRef};
+    use crate::{TokenStream, expr::binding_ref::BindingRef, parse_assert};
 
     #[test]
     fn parse_binding_ref() {
         let mut ts = TokenStream::new([t![id "bind"]]);
 
-        assert_eq!(
-            BindingRef::parse(&mut ts),
-            Ok(BindingRef(Identifier::new("bind")))
-        )
+        parse_assert(&mut ts, BindingRef(Identifier::new("bind")));
     }
 }

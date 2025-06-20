@@ -11,7 +11,7 @@ use super::{
 };
 
 /// An arithmetic operator.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Operation {
     /// The addition operator, `+`.
     Add,

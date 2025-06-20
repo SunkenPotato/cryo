@@ -16,7 +16,7 @@ use super::{
 type LexFunction = fn(&str) -> Result<(Token, &str), Span>;
 
 /// The different types a token can be.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum TokenType {
     /// The [`Keyword`] token.
@@ -132,7 +132,7 @@ impl Lex for TokenType {
 /// A token, as lexed by the lexer.
 ///
 /// Contains the actual token ([`Token::token`]) and the [`Span`] where this token lies in the input.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Token {
     /// The actual token.
     pub token: TokenType,

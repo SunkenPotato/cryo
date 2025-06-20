@@ -8,7 +8,7 @@ use binding_ref::BindingRef;
 use math_expr::Operator;
 
 use crate::{
-    Parse,
+    Parse, Spanned,
     error::ParseError,
     expr::{literal::Literal, math_expr::MathExpr},
 };
@@ -34,15 +34,18 @@ pub enum Expr {
 }
 
 impl Parse for Expr {
-    fn parse(stream: &mut crate::TokenStream) -> Result<Self, Box<dyn ParseError>> {
+    fn parse(stream: &mut crate::TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>> {
         let possible_op_token = stream.peek_n(1);
 
         if let Ok(v) = possible_op_token {
             if v.is::<Operator>() {
-                return Ok(Expr::MathExpr(Box::new(MathExpr::parse(stream)?)));
+                let me = MathExpr::parse(stream)?;
+                let me = Spanned(Box::new(me.0), me.1);
+
+                return Ok(me.map(Self::MathExpr));
             }
         }
-        return Ok(Expr::ReducedExpr(ReducedExpr::parse(stream)?));
+        return Ok(ReducedExpr::parse(stream)?.map(Self::ReducedExpr));
     }
 }
 
@@ -62,9 +65,9 @@ pub enum ReducedExpr {
 }
 
 impl Parse for ReducedExpr {
-    fn parse(stream: &mut crate::TokenStream) -> Result<Self, Box<dyn ParseError>> {
+    fn parse(stream: &mut crate::TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>> {
         Literal::parse(stream)
-            .map(Self::Literal)
-            .or_else(|_| BindingRef::parse(stream).map(Self::BindingRef))
+            .map(|v| v.map(ReducedExpr::Literal))
+            .or_else(|_| BindingRef::parse(stream).map(|v| v.map(Self::BindingRef)))
     }
 }

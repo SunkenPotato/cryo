@@ -17,7 +17,7 @@ use super::{
 macro_rules! keyword {
     ($($variant:ident = $val:tt),*) => {
         /// A keyword. View the module-level docs for more info.
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
         pub enum Keyword {
             $(
                 #[allow(missing_docs)]

@@ -14,7 +14,7 @@ use super::{
 /// A direct, constant-time defined value that can be evaluated without any further computation.
 ///
 /// This enum can be either a [`StringLiteral`] or a [`NumberLiteral`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Literal {
     /// A [`StringLiteral`].
     StringLiteral(StringLiteral),
@@ -40,7 +40,7 @@ impl Lex for Literal {
 ///
 /// A string literal is defined as a token starting with a `"` and ending with a `"`. \
 /// String literals support escaped characters, however, they are not evaluated by the parser, but rather by the lexer.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StringLiteral(pub String);
 
 impl Lex for StringLiteral {
@@ -90,7 +90,7 @@ impl Lex for StringLiteral {
 /// This struct represents an unparsed integer.
 ///
 /// Number literals may contain `_` between digits for clearer distinction and are otherwise only allowed the characters `0-9`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NumberLiteral(pub String);
 
 impl Lex for NumberLiteral {

@@ -179,6 +179,26 @@ impl Span {
 
         Some(Self::new_unchecked(file, start, stop))
     }
+
+    /// Extend this span with another one.
+    ///
+    /// Extension is done by setting the current span's end to the other span's end.
+    ///
+    /// # Panics
+    /// This method will panic if the other's span `stop` field is greater than the current one.
+    ///
+    /// See also:
+    /// [`Span::extend_unchecked`]
+    pub const fn extend(self, other: Span) -> Self {
+        assert!(self.stop <= other.stop);
+        self.extend_unchecked(other)
+    }
+
+    /// Does the same thing as [`Self::extend`], except it will not check for validity.
+    pub const fn extend_unchecked(mut self, other: Span) -> Self {
+        self.stop = other.stop;
+        self
+    }
 }
 
 impl std::fmt::Display for Span {
