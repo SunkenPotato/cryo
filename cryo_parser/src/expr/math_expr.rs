@@ -85,8 +85,6 @@ impl Parse for Operator {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
-
     use cryo_lexer::t;
 
     use crate::{
@@ -100,7 +98,7 @@ mod tests {
 
     #[test]
     fn parse_op() {
-        let mut ts = TokenStream::new(VecDeque::from([t![op+]]));
+        let mut ts = TokenStream::new([t![op+]]);
 
         assert_eq!(Operator::parse(&mut ts), Ok(Operator::Add));
         assert!(ts.container.is_empty())
@@ -108,7 +106,7 @@ mod tests {
 
     #[test]
     fn parse_math_expr() {
-        let mut ts = TokenStream::new(VecDeque::from([t![nl 5], t![op+], t![nl 5]]));
+        let mut ts = TokenStream::new([t![nl 5], t![op+], t![nl 5]]);
 
         assert_eq!(
             MathExpr::parse(&mut ts),

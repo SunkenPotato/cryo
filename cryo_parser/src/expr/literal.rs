@@ -191,8 +191,6 @@ impl Parse for StringLiteral {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
-
     use cryo_lexer::{
         literal::{Literal, NumberLiteral as NL, StringLiteral as SL},
         tokens::{Token, TokenType},
@@ -212,7 +210,7 @@ mod tests {
             TokenType::Literal(Literal::NumberLiteral(NL(input))),
             Span::EMPTY,
         );
-        let mut ts = TokenStream::new(VecDeque::from([token]));
+        let mut ts = TokenStream::new([token]);
 
         assert_eq!(
             NumberLiteral::parse(&mut ts),
@@ -229,7 +227,7 @@ mod tests {
             Span::EMPTY,
         );
 
-        let mut ts = TokenStream::new(VecDeque::from([token]));
+        let mut ts = TokenStream::new([token]);
 
         assert_eq!(
             NumberLiteral::parse(&mut ts),
@@ -263,7 +261,7 @@ mod tests {
             TokenType::Literal(Literal::StringLiteral(SL(ex.to_owned()))),
             Span::EMPTY,
         );
-        let mut ts = TokenStream::new(VecDeque::from([token]));
+        let mut ts = TokenStream::new([token]);
 
         assert_eq!(
             StringLiteral::parse(&mut ts),
@@ -277,7 +275,7 @@ mod tests {
             TokenType::Literal(Literal::StringLiteral(SL(ex.to_owned()))),
             Span::EMPTY,
         );
-        let mut ts = TokenStream::new(VecDeque::from([token]));
+        let mut ts = TokenStream::new([token]);
 
         assert_eq!(
             StringLiteral::parse(&mut ts),

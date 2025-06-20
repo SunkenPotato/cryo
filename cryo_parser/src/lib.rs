@@ -15,7 +15,7 @@ pub mod expr;
 use cryo_lexer::tokens::{Token, TokenGroup};
 use cryo_span::Span;
 
-use std::{collections::VecDeque, panic::Location};
+use std::collections::VecDeque;
 
 use crate::error::{GenericError, ParseError, SpannedGenericError};
 
@@ -34,9 +34,9 @@ pub struct SpecToken<'a, T> {
 
 impl TokenStream {
     /// Create a new stream from a [`VecDeque`].
-    pub const fn new(container: VecDeque<Token>) -> Self {
+    pub fn new(container: impl Into<VecDeque<Token>>) -> Self {
         Self {
-            container,
+            container: container.into(),
             commands: 0,
         }
     }

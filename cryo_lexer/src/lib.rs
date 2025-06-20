@@ -6,7 +6,9 @@
 
 #![deny(missing_docs)]
 
-use cryo_span::{INITIAL_FILE, LexResultExt, SourceFile, SourceFileError, SourceMap, Span};
+use cryo_span::{
+    INITIAL_FILE, LexResultExt, SourceFile, SourceFileError, SourceFileInput, SourceMap, Span,
+};
 use thiserror::Error;
 use tokens::Token;
 
@@ -132,7 +134,9 @@ impl Lexer {
     /// This method will try to parse the input it was given when it was constructed.
     pub fn lex(self) -> Result<Vec<Token>, LexicalError> {
         match self.mode {
-            LexerMode::DirectInput(v) => SourceMap::push(SourceFile::from_string(v, None)?),
+            LexerMode::DirectInput(v) => {
+                SourceMap::push(SourceFile::from_string(SourceFileInput::Direct(v))?)
+            }
             LexerMode::File(path) => SourceMap::push(SourceFile::new(path)?),
         }
 
@@ -140,7 +144,8 @@ impl Lexer {
 
         let mut tokens = vec![];
         #[allow(clippy::missing_panics_doc)]
-        let mut input = source_map.get(0).unwrap().contents().trim();
+        let contents = source_map.get(0).unwrap().contents();
+        let mut input = contents.trim();
         let mut offset = 0;
 
         while !input.is_empty() {

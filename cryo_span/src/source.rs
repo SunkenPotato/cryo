@@ -54,6 +54,18 @@ pub struct SourceFile {
     pub(crate) line_starts: Vec<usize>,
 }
 
+impl SourceFile {
+    /// Retrieve the contents of this source file.
+    pub fn contents<'a>(&'a self) -> Cow<'a, str> {
+        match &self.file {
+            SourceFileLocation::Fs(v) => {
+                Cow::Owned(std::fs::read_to_string(v).expect("file should be readable"))
+            }
+            SourceFileLocation::Direct(v) => Cow::Borrowed(&v),
+        }
+    }
+}
+
 /// Where the contents of a [`SourceFile`] live.
 #[derive(Debug)]
 pub enum SourceFileLocation {

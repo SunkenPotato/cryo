@@ -4,6 +4,7 @@
 //!
 //! For different types of expressions, view the [`Expr`] enum.
 
+use binding_ref::BindingRef;
 use math_expr::Operator;
 
 use crate::{
@@ -12,6 +13,7 @@ use crate::{
     expr::{literal::Literal, math_expr::MathExpr},
 };
 
+pub mod binding_ref;
 pub mod literal;
 pub mod math_expr;
 
@@ -55,10 +57,14 @@ impl From<ReducedExpr> for Expr {
 pub enum ReducedExpr {
     /// A literal expression.
     Literal(Literal),
+    /// A reference to a binding.
+    BindingRef(BindingRef),
 }
 
 impl Parse for ReducedExpr {
     fn parse(stream: &mut crate::TokenStream) -> Result<Self, Box<dyn ParseError>> {
-        Literal::parse(stream).map(Self::Literal)
+        Literal::parse(stream)
+            .map(Self::Literal)
+            .or_else(|_| BindingRef::parse(stream).map(Self::BindingRef))
     }
 }
