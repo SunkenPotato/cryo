@@ -215,14 +215,14 @@ macro_rules! t {
 
     (sl $sl:literal) => {{
         use $crate::{
-            literal::{Literal, NumberLiteral},
+            literal::{Literal, StringLiteral},
             tokens::{Token, TokenType},
         };
 
         use cryo_span::Span;
 
         Token::new(
-            TokenType::Literal(Literal::StringLiteral(StringLiteral($nl.to_owned()))),
+            TokenType::Literal(Literal::StringLiteral(StringLiteral($sl.to_owned()))),
             Span::EMPTY,
         )
     }};

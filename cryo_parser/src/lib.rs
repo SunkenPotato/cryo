@@ -12,116 +12,60 @@
 pub mod error;
 pub mod expr;
 
-use cryo_lexer::tokens::{Token, TokenGroup};
+use cryo_lexer::tokens::TokenGroup;
 use cryo_span::Span;
+use stream::{TokenStream, TokenStreamGuard};
 
-use std::{
-    collections::VecDeque,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
-use crate::error::{GenericError, ParseError, SpannedGenericError};
+use crate::error::ParseError;
 
-/// A newtype wrapper around a [`VecDeque`] for parse operations.
-#[derive(Debug, Clone, Hash)]
-pub struct TokenStream {
-    commands: usize,
-    container: VecDeque<Token>,
-}
+pub mod stream;
 
 /// A reference to a specialized token.
-pub struct SpecToken<'a, T> {
-    token: &'a T,
-    span: Span,
+pub struct SpecToken<'a, T: TokenGroup> {
+    /// A reference to the specialized token.
+    pub token: &'a T,
+    /// The span this token lives at.
+    pub span: Span,
 }
 
-impl TokenStream {
-    /// Create a new stream from a [`VecDeque`].
-    pub fn new(container: impl Into<VecDeque<Token>>) -> Self {
-        Self {
-            container: container.into(),
-            commands: 0,
-        }
-    }
-
-    /// Advance the stream, returning the first element in the stream if it exists.
-    ///
-    /// # Errors
-    /// Returns an error if the stream is empty.
-    #[track_caller]
-    pub fn advance(&mut self) -> Result<&Token, SpannedGenericError> {
-        self.container
-            .front()
-            .ok_or(SpannedGenericError::new(
-                Span::EMPTY,
-                GenericError::EndOfInput,
-            ))
-            .inspect(|_| self.commands += 1)
-    }
-
-    /// Advance the `TokenStream` and require the next token to be of `T`.
-    ///
-    /// Returns `Ok(T)` if the token is of `T`. \
-    ///
-    /// # Errors
-    /// If the token is not present or has the incorrect type, the stream will not be advanced
-    /// and return an error.
-    #[track_caller]
-    pub fn advance_require<T: 'static + TokenGroup>(
-        &mut self,
-    ) -> Result<SpecToken<'_, T>, SpannedGenericError> {
-        let token = self.advance()?;
-
-        let span = token.span;
-
-        match token.require_ref::<T>() {
-            Some(token) => Ok(SpecToken { token, span }),
-            None => Err(SpannedGenericError::new(
-                Span::EMPTY,
-                GenericError::IncorrectToken(T::NAME, token.name()),
-            )),
-        }
-    }
-
-    /// Peek at the next token. This method does the same as `advance`,
-    /// except when [`TokenStream::peek`] is called, the stream will not advance.
-    pub fn peek(&self) -> Result<&Token, SpannedGenericError> {
-        self.peek_n(0)
-    }
-
-    /// Peek at the n-th token ahead. View [`TokenStream::peek`] for more information.
-    pub fn peek_n(&self, n: usize) -> Result<&Token, SpannedGenericError> {
-        self.container.get(n).ok_or(SpannedGenericError::new(
-            Span::EMPTY,
-            GenericError::EndOfInput,
-        ))
-    }
-
-    /// Apply all pending commands.
-    pub fn sync(&mut self) {
-        self.container.drain(..self.commands);
-        self.commands = 0;
-    }
-}
-
-/// A parser production with a [`Span`].
+/// A parser production or error with a [`Span`].
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct Spanned<T>(pub T, pub Span);
+pub struct Spanned<T> {
+    /// The actual value.
+    pub t: T,
+    /// The span.
+    pub span: Span,
+}
 
 impl<T> Spanned<T> {
+    /// Create a new [`Spanned`]
+    pub const fn new(t: T, span: Span) -> Self {
+        Self { t, span }
+    }
+
     /// Map a `Spanned<T>` into a `Spanned<U>` with the given closure.
     pub fn map<F, U>(self, f: F) -> Spanned<U>
     where
         F: FnOnce(T) -> U,
     {
-        Spanned(f(self.0), self.1)
+        Spanned {
+            t: f(self.t),
+            span: self.span,
+        }
     }
 
     /// Extend the current span with another span.
     ///
     /// View [`Span::extend`] for more information.
     pub fn extend<U>(&mut self, other: Spanned<U>) {
-        self.1 = self.1.extend(other.1)
+        self.span = self.span.extend(other.span)
+    }
+
+    /// Convert `self` to a tuple.
+    pub fn as_tuple(self) -> (T, Span) {
+        (self.t, self.span)
     }
 }
 
@@ -129,15 +73,18 @@ impl<T> Deref for Spanned<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.t
     }
 }
 
 impl<T> DerefMut for Spanned<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.t
     }
 }
+
+/// The output of [`Parse::parse`].
+pub type ParseResult<T> = Result<Spanned<T>, Box<dyn ParseError>>;
 
 /// Trait for parsing operations.
 ///
@@ -148,19 +95,19 @@ pub trait Parse: Sized {
     ///
     /// # Errors
     /// The error depends on the implementation of the trait.
-    fn parse(stream: &mut TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>>;
+    fn parse<'t>(stream: &mut TokenStreamGuard<'t>) -> ParseResult<Self>;
 }
 
 /// Assert a parser production matches the given one, as well as that the stream has been entirely consumed.
 #[cfg(test)]
 #[track_caller]
 pub fn parse_assert<T: Parse + std::fmt::Debug + PartialEq>(stream: &mut TokenStream, expect: T) {
-    match T::parse(stream) {
-        Ok(Spanned(token, _)) => assert_eq!(expect, token),
+    match parse(stream) {
+        Ok(Spanned { t, span: _ }) => assert_eq!(expect, t),
         Err(e) => panic!("{e}"),
     }
 
-    assert!(stream.container.is_empty());
+    assert!(stream.inner().is_empty());
 }
 
 /// Assert that a given type fails to parse the stream, as well as that the stream has not been consumed.
@@ -174,32 +121,22 @@ where
 {
     use std::panic::Location;
 
-    let len = stream.container.len();
+    let len = stream.inner().len();
 
-    match T::parse(stream) {
+    match parse::<T>(stream) {
         Ok(v) => panic!("test at {} should have failed: {v:#?}", Location::caller()),
         Err(e) => assert!(*e == err),
     };
 
-    let len2 = stream.container.len();
+    let len2 = stream.inner().len();
 
     assert_eq!(len, len2);
 }
 
-/// Parses a list of tokens into an AST.
-pub struct Parser {
-    #[expect(unused)]
-    tokens: Vec<Token>,
-}
-
-impl Parser {
-    /// Create a new parser from a list of tokens.
-    pub const fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens }
-    }
-
-    /// Consume the tokens passed and generate an abstract syntax tree.
-    pub fn parse(self) -> () {
-        todo!()
-    }
+/// Try to parse a [`TokenStream`] as `T`.
+pub fn parse<T>(tokens: &mut TokenStream) -> ParseResult<T>
+where
+    T: Parse,
+{
+    tokens.with(T::parse)
 }

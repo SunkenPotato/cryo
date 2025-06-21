@@ -26,19 +26,22 @@ pub struct MathExpr {
 }
 
 impl Parse for MathExpr {
-    #[track_caller]
-    fn parse(stream: &mut crate::TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>> {
-        let Spanned(lhs, lspan) = match ReducedExpr::parse(stream) {
+    fn parse<'t>(
+        stream: &mut crate::TokenStreamGuard<'t>,
+    ) -> Result<Spanned<Self>, Box<dyn ParseError>> {
+        let (lhs, lspan) = match ReducedExpr::parse(stream) {
             Ok(v) => v.map(Expr::ReducedExpr),
             Err(e) => return Err(e),
-        };
+        }
+        .as_tuple();
+        println!("{stream:?}");
 
-        let Spanned(op, op_span) = Operator::parse(stream)?;
-        let Spanned(rhs, rspan) = Expr::parse(stream)?;
+        let (op, op_span) = Operator::parse(stream).unwrap().as_tuple();
+        let (rhs, rspan) = Expr::parse(stream).unwrap().as_tuple();
 
         let span = lspan.extend(op_span).extend(rspan);
 
-        Ok(Spanned(Self { lhs, op, rhs }, span))
+        Ok(Spanned::new(Self { lhs, op, rhs }, span))
     }
 }
 
@@ -70,24 +73,25 @@ impl From<OpToken> for Operator {
 }
 
 impl Parse for Operator {
-    fn parse(stream: &mut crate::TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>> {
+    fn parse<'t>(
+        stream: &mut crate::TokenStreamGuard<'t>,
+    ) -> Result<Spanned<Self>, Box<dyn ParseError>> {
         let SpecToken { token, span } = stream.advance_require::<OpToken>()?;
         let token = *token;
 
-        stream.sync();
-
-        Ok(Spanned(token.into(), span))
+        Ok(Spanned::new(token.into(), span))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use cryo_lexer::t;
+    use cryo_lexer::{identifier::Identifier, t};
 
     use crate::{
         TokenStream,
         expr::{
             Expr, ReducedExpr,
+            binding_ref::BindingRef,
             literal::{Literal, NumberLiteral},
             math_expr::{MathExpr, Operator},
         },
@@ -115,6 +119,22 @@ mod tests {
                 rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::NumberLiteral(
                     NumberLiteral(5),
                 ))),
+            },
+        )
+    }
+
+    #[test]
+    fn parse_math_expr_binding_ref() {
+        let mut ts = TokenStream::new([t![nl 5], t![op+], t![id "y"]]);
+
+        parse_assert(
+            &mut ts,
+            MathExpr {
+                lhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::NumberLiteral(
+                    NumberLiteral(5),
+                ))),
+                op: Operator::Add,
+                rhs: Expr::ReducedExpr(ReducedExpr::BindingRef(BindingRef(Identifier::new("y")))),
             },
         )
     }

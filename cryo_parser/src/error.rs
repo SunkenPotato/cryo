@@ -11,6 +11,8 @@ use std::{borrow::Cow, fmt::Display, sync::OnceLock};
 
 use cryo_span::Span;
 
+use crate::Spanned;
+
 /// Information a parse error contains.
 pub trait ParseError {
     /// The span at which the error occurred.
@@ -71,7 +73,7 @@ impl std::fmt::Debug for dyn ParseError {
 
 impl std::fmt::Display for dyn ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
+        writeln!(
             f,
             "error({}) {}@{}: {}",
             self.name(),
@@ -85,14 +87,13 @@ impl std::fmt::Display for dyn ParseError {
     }
 }
 
-#[macro_export]
-/// Helper macro to make returning [`ParseError`]s easier.
-macro_rules! err {
-    ($etype:ty, $err:expr, $span:expr) => {{ Box::new(<$etype>::new($span, $err)) as Box<dyn ParseError> }};
-
-    ($etype:ty, $err:expr) => {
-        err!($etype, $err, cryo_span::Span::EMPTY)
-    };
+/// Convenience function for generating a [`Box<dyn ParseError>`] from an error and a span.
+pub fn err<T>(err: T, span: Span) -> Box<dyn ParseError>
+where
+    Spanned<T>: ParseError,
+    T: 'static,
+{
+    Box::new(Spanned::new(err, span))
 }
 
 /// Emits only the second input passed. Used for macro repetitions.
@@ -117,17 +118,6 @@ macro_rules! parse_error {
             ),*
         }
     ) => {
-        ::paste::paste! {
-            $(#[$attr])*
-            #[doc = concat!("A ", stringify!($name), " error with a Span.")]
-            $visibility struct [<Spanned $name>] {
-                /// The span this error points to.
-                $visibility span: cryo_span::Span,
-                /// The inner error.
-                $visibility error: $name
-            }
-        }
-
         $(#[$attr])*
         $visibility enum $name {
             $(
@@ -139,13 +129,13 @@ macro_rules! parse_error {
         }
 
         ::paste::paste! {
-            impl ParseError for [<Spanned $name>] {
+            impl ParseError for crate::Spanned<$name> {
                 fn span(&self) -> cryo_span::Span {
                     self.span
                 }
 
                 fn subcode(&self) -> u32 {
-                    self.error.get_code()
+                    self.t.get_code()
                 }
 
                 fn code(&self) -> u32 {
@@ -153,15 +143,7 @@ macro_rules! parse_error {
                 }
 
                 fn message(&self) -> String {
-                    self.error.get_message()
-                }
-            }
-
-            impl [<Spanned $name>] {
-                #[doc = concat!("Create a new Spanned", stringify!($name), ".")]
-                #[inline]
-                $visibility const fn new(span: cryo_span::Span, error: $name) -> Self {
-                    Self { span, error }
+                    self.t.get_message()
                 }
             }
         }
@@ -199,6 +181,14 @@ macro_rules! parse_error {
             )*
         }
     ) => {
+        const _: () = {
+            const fn assert_parse<T: ParseError>() {}
+
+            $(
+                assert_parse::<$inner>();
+            )*
+        };
+
         $(
             #[$attr]
         )*

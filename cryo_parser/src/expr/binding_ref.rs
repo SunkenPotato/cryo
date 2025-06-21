@@ -5,20 +5,17 @@
 use cryo_lexer::identifier::Identifier;
 
 use crate::{Parse, Spanned, SpecToken};
-use cryo_lexer::identifier::Identifier as IToken;
 
 /// A reference to a binding.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct BindingRef(pub Identifier);
 
 impl Parse for BindingRef {
-    fn parse(
-        stream: &mut crate::TokenStream,
-    ) -> Result<Spanned<Self>, Box<dyn crate::error::ParseError>> {
-        let SpecToken { token, span } = stream.advance_require::<IToken>()?;
+    fn parse<'t>(stream: &mut crate::stream::TokenStreamGuard<'t>) -> crate::ParseResult<Self> {
+        let SpecToken { token, span } = stream.advance_require::<Identifier>()?;
         let token = *token;
-        stream.sync();
-        Ok(Spanned(Self(token), span))
+
+        Ok(Spanned::new(Self(token), span))
     }
 }
 

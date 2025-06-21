@@ -7,9 +7,11 @@
 //! - arithmetic expressions
 
 use crate::{
-    Parse, Spanned, SpecToken, err,
-    error::{GenericError, ParseError, SpannedGenericError},
+    Parse, ParseResult, Spanned, SpecToken,
+    error::err,
+    error::{GenericError, ParseError},
     parse_error,
+    stream::TokenStreamGuard,
 };
 use cryo_lexer::literal::Literal as LToken;
 
@@ -43,17 +45,22 @@ parse_error! {
     #(group)
     pub enum LiteralParseError {
         /// A number literal parse error. View [`NumberLiteralError`] for more info.
-        NumberLiteralParseError(SpannedNumberLiteralError),
+        NumberLiteralParseError(Spanned<NumberLiteralError>),
         /// A string literal parse error. View [`StringLiteralError`] for more info.
-        StringLiteralParseError(SpannedStringLiteralError),
+        StringLiteralParseError(Spanned<StringLiteralError>),
     }
 }
 
 impl Parse for Literal {
-    fn parse(stream: &mut crate::TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>> {
-        NumberLiteral::parse(stream)
+    fn parse<'t>(stream: &mut TokenStreamGuard<'t>) -> ParseResult<Self> {
+        stream
+            .with(NumberLiteral::parse)
             .map(|v| v.map(Self::NumberLiteral))
-            .or_else(|_| StringLiteral::parse(stream).map(|v| v.map(Self::StringLiteral)))
+            .or_else(|_| {
+                stream
+                    .with(StringLiteral::parse)
+                    .map(|v| v.map(Self::StringLiteral))
+            })
     }
 }
 
@@ -74,14 +81,10 @@ parse_error! {
 }
 
 impl Parse for NumberLiteral {
-    fn parse(stream: &mut crate::TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>> {
+    fn parse<'t>(stream: &mut TokenStreamGuard<'t>) -> ParseResult<Self> {
         let SpecToken { token, span } = stream.advance_require::<LToken>()?;
         let LToken::NumberLiteral(number) = token else {
-            return Err(err!(
-                SpannedGenericError,
-                GenericError::IncorrectToken("number", "string"),
-                span
-            ));
+            return Err(err(GenericError::IncorrectToken("number", "string"), span));
         };
 
         let mut integer = 0i32;
@@ -98,28 +101,14 @@ impl Parse for NumberLiteral {
                     let digit = digit - ASCII_ZERO;
                     integer = integer
                         .checked_mul(10)
-                        .ok_or_else(|| {
-                            err!(
-                                SpannedNumberLiteralError,
-                                NumberLiteralError::Overflow,
-                                span
-                            )
-                        })?
+                        .ok_or_else(|| err(NumberLiteralError::Overflow, span))?
                         .checked_add(digit as i32)
-                        .ok_or_else(|| {
-                            err!(
-                                SpannedNumberLiteralError,
-                                NumberLiteralError::Overflow,
-                                span
-                            )
-                        })?;
+                        .ok_or_else(|| err(NumberLiteralError::Overflow, span))?;
                 }
             }
         }
 
-        stream.sync();
-
-        Ok(Spanned(Self(integer * sign), span))
+        Ok(Spanned::new(Self(integer * sign), span))
     }
 }
 
@@ -141,14 +130,10 @@ parse_error! {
 
 impl Parse for StringLiteral {
     // TODO: add support for unicode escapes
-    fn parse(stream: &mut crate::TokenStream) -> Result<Spanned<Self>, Box<dyn ParseError>> {
+    fn parse<'t>(stream: &mut TokenStreamGuard<'t>) -> ParseResult<Self> {
         let SpecToken { token, span } = stream.advance_require::<LToken>()?;
         let LToken::StringLiteral(number) = token else {
-            return Err(err!(
-                SpannedGenericError,
-                GenericError::IncorrectToken("string", "number"),
-                span
-            ));
+            return Err(err(GenericError::IncorrectToken("string", "number"), span));
         };
 
         let mut iter = number.0.chars();
@@ -157,11 +142,7 @@ impl Parse for StringLiteral {
         while let Some(ch) = iter.next() {
             if ch == ESCAPE {
                 let Some(escaped) = iter.next() else {
-                    return Err(err!(
-                        SpannedStringLiteralError,
-                        StringLiteralError::InvalidEscape('\0'),
-                        span
-                    ));
+                    return Err(err(StringLiteralError::InvalidEscape('\0'), span));
                 };
 
                 let escaped = match escaped {
@@ -170,11 +151,7 @@ impl Parse for StringLiteral {
                     TAB_ESCAPE => '\t',
                     NULL_ESCAPE => '\0',
                     ch => {
-                        return Err(err!(
-                            SpannedStringLiteralError,
-                            StringLiteralError::InvalidEscape(ch),
-                            span
-                        ));
+                        return Err(err(StringLiteralError::InvalidEscape(ch), span));
                     }
                 };
 
@@ -184,8 +161,7 @@ impl Parse for StringLiteral {
             }
         }
 
-        stream.sync();
-        Ok(Spanned(Self(buffer), span))
+        Ok(Spanned::new(Self(buffer), span))
     }
 }
 
@@ -193,13 +169,14 @@ impl Parse for StringLiteral {
 mod tests {
     use cryo_lexer::{
         literal::{Literal, NumberLiteral as NL, StringLiteral as SL},
+        t,
         tokens::{Token, TokenType},
     };
     use cryo_span::Span;
 
     use crate::{
-        Parse, TokenStream,
-        error::{ParseError, test_error::TestError},
+        TokenStream,
+        error::test_error::TestError,
         expr::literal::{NumberLiteral, StringLiteral},
         parse_assert, parse_assert_err,
     };
@@ -226,11 +203,7 @@ mod tests {
 
         let mut ts = TokenStream::new([token]);
 
-        assert_eq!(
-            NumberLiteral::parse(&mut ts),
-            Err(Box::new(TestError::new(1, 0)) as Box<dyn ParseError>)
-        );
-        assert!(!ts.container.is_empty());
+        parse_assert_err::<NumberLiteral, _>(&mut ts, TestError::new(1, 0));
     }
 
     #[test]
@@ -251,6 +224,23 @@ mod tests {
     #[test]
     fn do_not_parse_missing_escape() {
         str_test_fail("hello, world\\", TestError::new(2, 0));
+    }
+
+    #[test]
+    fn parse_str_literal() {
+        let mut ts = TokenStream::new([t![sl "hello, world"]]);
+
+        parse_assert(
+            &mut ts,
+            super::Literal::StringLiteral(StringLiteral("hello, world".into())),
+        )
+    }
+
+    #[test]
+    fn parse_num_literal() {
+        let mut ts = TokenStream::new([t![nl 5]]);
+
+        parse_assert(&mut ts, super::Literal::NumberLiteral(NumberLiteral(5)))
     }
 
     fn str_test(ex: &str, re: &str) {
