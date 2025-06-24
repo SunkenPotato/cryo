@@ -1,2 +1,3 @@
 [workspace]
 resolver = "3"
+members = ["cryo_lexer", "cryo_span"]
