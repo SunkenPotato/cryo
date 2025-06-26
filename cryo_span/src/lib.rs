@@ -1,5 +1,6 @@
 use std::{
     fmt::{Display, Formatter},
+    ops::{Add, AddAssign},
     sync::OnceLock,
 };
 
@@ -32,7 +33,23 @@ pub struct Span {
 impl Span {
     #[inline]
     pub const fn new(start: u32, stop: u32, file: u16) -> Self {
+        assert!(stop > start);
         Self { start, stop, file }
+    }
+}
+
+impl Add for Span {
+    type Output = Self;
+    fn add(mut self, rhs: Self) -> Self::Output {
+        debug_assert!(self.stop <= rhs.stop);
+        self.stop = rhs.stop;
+        self
+    }
+}
+
+impl AddAssign for Span {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
     }
 }
 
@@ -59,5 +76,35 @@ impl Display for Span {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Spanned<T> {
+    t: T,
+    span: Span,
+}
+
+impl<T> Spanned<T> {
+    pub fn map<F, U>(self, f: F) -> Spanned<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        Spanned {
+            t: f(self.t),
+            span: self.span,
+        }
+    }
+
+    pub fn extend(mut self, span: Span) -> Self {
+        self.span += span;
+
+        self
+    }
+}
+
+impl<T: Display> Display for Spanned<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} @ {}", self.t, self.span)
     }
 }
