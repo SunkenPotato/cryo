@@ -9,17 +9,17 @@ use crate::source_map::{SourceFile, SourceMap};
 
 static INPUT: &str = "Hello\nworld\n!\n;";
 
-struct TempFile(File, PathBuf);
+pub struct TempFile(File, PathBuf);
 
 impl TempFile {
-    fn create() -> Self {
+    pub fn create() -> Self {
         let id = rand::random::<u32>();
         let path = PathBuf::from(id.to_string());
 
         Self(File::create(&path).unwrap(), path)
     }
 
-    fn new(s: &str) -> Self {
+    pub fn new(s: &str) -> Self {
         let mut f = Self::create();
 
         f.0.write_all(s.as_bytes()).unwrap();

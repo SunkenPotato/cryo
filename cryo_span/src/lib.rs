@@ -1,6 +1,6 @@
 use std::{
     fmt::{Display, Formatter},
-    ops::{Add, AddAssign},
+    ops::{Add, AddAssign, Deref, DerefMut},
     sync::OnceLock,
 };
 
@@ -9,6 +9,9 @@ use crate::source_map::SourceMap;
 pub mod source_map;
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub use tests::TempFile;
 
 static SOURCE_MAP: OnceLock<SourceMap> = OnceLock::new();
 
@@ -25,16 +28,30 @@ pub fn initialize(map: SourceMap) -> Result<&'static SourceMap, SourceMap> {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Span {
-    pub start: u32,
-    pub stop: u32,
+    pub start: usize,
+    pub stop: usize,
     pub file: u16,
 }
 
 impl Span {
     #[inline]
-    pub const fn new(start: u32, stop: u32, file: u16) -> Self {
-        assert!(stop > start);
+    #[track_caller]
+    pub const fn new(start: usize, stop: usize) -> Self {
+        Self::new_file(start, stop, 0)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub const fn new_file(start: usize, stop: usize, file: u16) -> Self {
+        assert!(stop >= start);
         Self { start, stop, file }
+    }
+
+    pub const fn offset(mut self, offset: usize) -> Self {
+        self.start += offset;
+        self.stop += offset;
+
+        self
     }
 }
 
@@ -54,25 +71,26 @@ impl AddAssign for Span {
 }
 
 impl Display for Span {
+    // TODO: replace unwraps.
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let instance = get_source_map();
         let file = instance.get(self.file.into()).unwrap();
 
-        let start = self.start.try_into().unwrap();
-        let stop = self.stop.try_into().unwrap();
         let path = &file.file;
-        let ((start_line, start_col), (end_line, end_col)) =
-            (file.line_col(start).unwrap(), file.line_col(stop).unwrap());
+        let ((start_line, start_col), (end_line, end_col)) = (
+            file.line_col(self.start).unwrap(),
+            file.line_col(self.stop).unwrap(),
+        );
 
-        let source = file.resolve_source(start, stop).unwrap();
+        let source = file.resolve_source(self.start, self.stop).unwrap();
 
         write!(
             f,
             "{}:{start_line}:{start_col} - {end_line}:{end_col}:",
             path.display()
         )?;
-        for line in source.lines() {
-            write!(f, "\n\t5 | {line}")?;
+        for (idx, line) in source.lines().enumerate() {
+            write!(f, "\n\t{} | {line}", idx + start_line)?;
         }
 
         Ok(())
@@ -81,11 +99,15 @@ impl Display for Span {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Spanned<T> {
-    t: T,
-    span: Span,
+    pub t: T,
+    pub span: Span,
 }
 
 impl<T> Spanned<T> {
+    pub const fn new(t: T, span: Span) -> Self {
+        Self { t, span }
+    }
+
     pub fn map<F, U>(self, f: F) -> Spanned<U>
     where
         F: FnOnce(T) -> U,
@@ -98,8 +120,26 @@ impl<T> Spanned<T> {
 
     pub fn extend(mut self, span: Span) -> Self {
         self.span += span;
-
         self
+    }
+
+    pub const fn offset(mut self, offset: usize) -> Self {
+        self.span = self.span.offset(offset);
+        self
+    }
+}
+
+impl<T> Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.t
+    }
+}
+
+impl<T> DerefMut for Spanned<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.t
     }
 }
 

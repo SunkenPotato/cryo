@@ -3,5 +3,8 @@ name = "cryo_lexer"
 version = "0.1.0"
 edition = "2024"
 
+[dev-dependencies]
+paste = "*"
+
 [dependencies]
 cryo_span = { version = "0.1.0", path = "../cryo_span" }
