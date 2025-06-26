@@ -4,3 +4,4 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+cryo_span = { version = "0.1.0", path = "../cryo_span" }
