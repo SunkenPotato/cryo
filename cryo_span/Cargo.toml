@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+memchr = "2.7.5"
+
+[dev-dependencies]
+rand = "0.9.1"
