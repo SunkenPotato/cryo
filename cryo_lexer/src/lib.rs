@@ -1,6 +1,7 @@
 pub mod atoms;
 pub mod identifier;
 pub mod literal;
+pub mod stream;
 
 use std::fmt::Display;
 
@@ -17,6 +18,24 @@ type LexFn = fn(&str) -> Result<(Token, &str), Error>;
 type Error = Spanned<LexicalError>;
 
 #[macro_export]
+macro_rules! token_marker {
+    (
+        $type:ident $(<$lt:tt>)?
+    ) => {
+        impl<'source> $crate::FromToken<'source> for $type $(<$lt>)? {
+            fn from_token<'borrow>(
+                token: &'borrow $crate::TokenType<'source>,
+            ) -> Option<&'borrow Self> {
+                match token {
+                    $crate::TokenType::$type(v) => Some(v),
+                    _ => None,
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
 #[doc(hidden)]
 macro_rules! atom {
     (
@@ -30,6 +49,8 @@ macro_rules! atom {
                 Ok(($crate::Token::new($crate::TokenType::$identifier(Self), cryo_span::Span::new(0, $atom.len())), rest))
             }
         }
+
+        $crate::token_marker!($identifier);
 
         #[cfg(test)]
         ::paste::paste! {
@@ -99,6 +120,8 @@ macro_rules! atom {
             }
         }
 
+        $crate::token_marker!($identifier);
+
         #[cfg(test)]
         ::paste::paste! {
             #[allow(non_snake_case)]
@@ -166,7 +189,11 @@ pub enum TokenType<'source> {
     Semi(Semi),
 }
 
-impl TokenType<'_> {
+trait FromToken<'source> {
+    fn from_token<'borrow>(token: &'borrow TokenType<'source>) -> Option<&'borrow Self>;
+}
+
+impl<'s> TokenType<'s> {
     // the order of these is important
     const LEX_FUNCTIONS: &'static [LexFn] = &[
         Keyword::lex,
@@ -176,6 +203,14 @@ impl TokenType<'_> {
         Assign::lex,
         Semi::lex,
     ];
+
+    #[allow(private_bounds)]
+    pub fn require<T>(&self) -> Option<&T>
+    where
+        T: FromToken<'s>,
+    {
+        T::from_token(self)
+    }
 }
 
 impl Lex for TokenType<'_> {
