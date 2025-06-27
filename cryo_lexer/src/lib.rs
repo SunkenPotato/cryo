@@ -1,3 +1,5 @@
+#![feature(option_array_transpose)]
+
 pub mod atoms;
 pub mod identifier;
 pub mod literal;
@@ -210,6 +212,11 @@ impl<'s> TokenType<'s> {
         T: FromToken<'s>,
     {
         T::from_token(self)
+    }
+
+    #[allow(private_bounds)]
+    pub fn is<T: FromToken<'s>>(&self) -> bool {
+        T::from_token(self).is_some()
     }
 }
 

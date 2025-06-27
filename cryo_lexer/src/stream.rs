@@ -1,3 +1,5 @@
+use std::array;
+
 use crate::{FromToken, Token};
 
 pub struct TokenStream<'source> {
@@ -5,9 +7,7 @@ pub struct TokenStream<'source> {
 }
 
 impl<'source> TokenStream<'source> {
-    /// This will reverse the input.
-    pub fn new(mut s: Vec<Token<'source>>) -> Self {
-        s.reverse();
+    pub fn new(s: Vec<Token<'source>>) -> Self {
         Self { inner: s }
     }
 
@@ -38,7 +38,7 @@ pub struct TokenStreamGuard<'stream, 'source> {
 
 impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
     pub fn advance(&'stream mut self) -> Option<&'stream Token<'source>> {
-        self.stream.inner.last().inspect(|_| self.cursor += 1)
+        self.stream.inner.first().inspect(|_| self.cursor += 1)
     }
 
     #[expect(private_bounds)]
@@ -47,12 +47,20 @@ impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
     }
 
     pub fn peek(&'stream self) -> Option<&'stream Token<'source>> {
-        self.stream.inner.last()
+        self.stream.inner.first()
     }
 
     #[expect(private_bounds)]
     pub fn peek_require<T: FromToken<'source>>(&'stream self) -> Option<&'stream T> {
         self.peek()?.require()
+    }
+
+    pub fn peek_n(&'stream self, idx: usize) -> Option<&'stream Token<'source>> {
+        self.stream.inner.get(idx)
+    }
+
+    pub fn peek_slice_n<const N: usize>(&'stream self) -> Option<[&'stream Token<'source>; N]> {
+        array::from_fn(|idx| self.peek_n(idx)).transpose()
     }
 
     pub fn with<F, T, E>(&mut self, f: F) -> Result<T, E>
