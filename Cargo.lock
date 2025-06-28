@@ -23,6 +23,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cryo_parser"
+version = "0.1.0"
+dependencies = [
+ "cryo_lexer",
+ "cryo_span",
+]
+
+[[package]]
 name = "cryo_span"
 version = "0.1.0"
 dependencies = [
