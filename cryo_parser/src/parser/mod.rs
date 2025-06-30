@@ -4,19 +4,17 @@ use crate::error::ParseError;
 
 mod combinators;
 
-fn terminal<'source, T, O, E, F>(
+pub fn terminal<'source, T, R, E, F>(
     stream: &mut TokenStream<'source>,
     f: F,
-) -> Result<O, Box<dyn ParseError>>
+) -> Result<R, Box<dyn ParseError>>
 where
     T: FromToken<'source>,
     E: ParseError + 'static,
-    F: FnOnce(&T) -> Result<O, E>,
+    F: FnOnce(&T) -> Result<R, E>,
 {
     stream.with(|guard| {
-        let token = guard.advance_require::<T>()?;
-        let p_result = f(token)?;
-
-        Ok(p_result)
+        let token = guard.advance_require()?;
+        Ok(f(token)?)
     })
 }

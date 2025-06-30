@@ -46,7 +46,7 @@ pub struct TokenStreamGuard<'stream, 'source> {
 }
 
 impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
-    pub fn advance(&'stream mut self) -> Result<&'stream Token<'source>, TokenStreamError> {
+    pub fn advance<'b>(&'b mut self) -> Result<&'b Token<'source>, TokenStreamError> {
         self.stream
             .inner
             .first()
@@ -54,9 +54,9 @@ impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
             .ok_or(EOI)
     }
 
-    pub fn advance_require<T: FromToken<'source>>(
-        &'stream mut self,
-    ) -> Result<&'stream T, TokenStreamError> {
+    pub fn advance_require<'b, T: FromToken<'source>>(
+        &'b mut self,
+    ) -> Result<&'b T, TokenStreamError> {
         let token = self.advance()?;
         token
             .require()
