@@ -34,6 +34,8 @@ pub struct Span {
 }
 
 impl Span {
+    pub const ZERO: Self = Span::new(0, 0);
+
     #[inline]
     #[track_caller]
     pub const fn new(start: usize, stop: usize) -> Self {

@@ -1,7 +1,7 @@
 #![allow(private_bounds, private_interfaces)]
 
 pub mod error;
-pub mod expr;
+pub mod parser;
 
 use cryo_lexer::stream::{TokenStream, TokenStreamGuard};
 use cryo_span::Spanned;
@@ -12,10 +12,11 @@ type ParseResult<T> = Result<S<T>, S<Box<dyn ParseError>>>;
 use crate::error::ParseError;
 
 trait Parse: Sized {
-    fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self>;
+    type Output;
+    fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output>;
 }
 
-pub fn parser<T>(mut tokens: TokenStream) -> ParseResult<T>
+pub fn parser<T>(mut tokens: TokenStream) -> ParseResult<T::Output>
 where
     T: Parse,
 {
@@ -24,14 +25,17 @@ where
 
 #[cfg(test)]
 mod test_util {
+    use std::fmt::Debug;
+
     use cryo_lexer::stream::TokenStream;
 
     use crate::{Parse, S, error::ParseError};
 
     #[track_caller]
-    pub(crate) fn assert_parse<T>(mut tokens: TokenStream, expect: S<T>)
+    pub(crate) fn assert_parse<T>(mut tokens: TokenStream, expect: S<T::Output>)
     where
-        T: Parse + std::fmt::Debug + PartialEq,
+        T: Parse,
+        T::Output: Debug + PartialEq,
     {
         let result = tokens.with(T::parse);
 
@@ -76,7 +80,8 @@ mod test_util {
     #[track_caller]
     pub(crate) fn assert_parse_fail<T>(mut tokens: TokenStream, expect: TestError)
     where
-        T: Parse + std::fmt::Debug,
+        T: Parse,
+        T::Output: Debug,
     {
         let result = tokens.with(T::parse);
         match result {

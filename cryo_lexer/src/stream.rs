@@ -1,5 +1,7 @@
 use std::array;
 
+use cryo_span::Span;
+
 use crate::{FromToken, Token};
 
 pub struct TokenStream<'source> {
@@ -31,36 +33,57 @@ impl<'source> TokenStream<'source> {
     }
 }
 
+pub enum TokenStreamError {
+    EndOfInput,
+    IncorrectToken(&'static str, Span),
+}
+
+const EOI: TokenStreamError = TokenStreamError::EndOfInput;
+
 pub struct TokenStreamGuard<'stream, 'source> {
     stream: &'stream mut TokenStream<'source>,
     cursor: usize,
 }
 
 impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
-    pub fn advance(&'stream mut self) -> Option<&'stream Token<'source>> {
-        self.stream.inner.first().inspect(|_| self.cursor += 1)
+    pub fn advance(&'stream mut self) -> Result<&'stream Token<'source>, TokenStreamError> {
+        self.stream
+            .inner
+            .first()
+            .inspect(|_| self.cursor += 1)
+            .ok_or(EOI)
     }
 
-    #[expect(private_bounds)]
-    pub fn advance_require<T: FromToken<'source>>(&'stream mut self) -> Option<&'stream T> {
-        self.advance()?.require()
+    pub fn advance_require<T: FromToken<'source>>(
+        &'stream mut self,
+    ) -> Result<&'stream T, TokenStreamError> {
+        let token = self.advance()?;
+        token
+            .require()
+            .ok_or(TokenStreamError::IncorrectToken(T::NAME, token.span))
     }
 
-    pub fn peek(&'stream self) -> Option<&'stream Token<'source>> {
-        self.stream.inner.first()
+    pub fn peek(&'stream self) -> Result<&'stream Token<'source>, TokenStreamError> {
+        self.stream.inner.first().ok_or(EOI)
     }
 
-    #[expect(private_bounds)]
-    pub fn peek_require<T: FromToken<'source>>(&'stream self) -> Option<&'stream T> {
-        self.peek()?.require()
+    pub fn peek_require<T: FromToken<'source>>(
+        &'stream self,
+    ) -> Result<&'stream T, TokenStreamError> {
+        let token = self.peek()?;
+        token
+            .require()
+            .ok_or(TokenStreamError::IncorrectToken(T::NAME, token.span))
     }
 
-    pub fn peek_n(&'stream self, idx: usize) -> Option<&'stream Token<'source>> {
-        self.stream.inner.get(idx)
+    pub fn peek_n(&'stream self, idx: usize) -> Result<&'stream Token<'source>, TokenStreamError> {
+        self.stream.inner.get(idx).ok_or(EOI)
     }
 
-    pub fn peek_slice_n<const N: usize>(&'stream self) -> Option<[&'stream Token<'source>; N]> {
-        array::from_fn(|idx| self.peek_n(idx)).transpose()
+    pub fn peek_slice_n<const N: usize>(
+        &'stream self,
+    ) -> Result<[&'stream Token<'source>; N], TokenStreamError> {
+        array::from_fn(|idx| self.peek_n(idx)).try_map(core::convert::identity)
     }
 
     pub fn with<F, T, E>(&mut self, f: F) -> Result<T, E>

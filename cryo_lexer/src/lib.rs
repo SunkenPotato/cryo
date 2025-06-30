@@ -1,4 +1,4 @@
-#![feature(option_array_transpose)]
+#![feature(array_try_map)]
 
 pub mod atoms;
 pub mod identifier;
@@ -24,7 +24,10 @@ macro_rules! token_marker {
     (
         $type:ident $(<$lt:tt>)?
     ) => {
+        impl<'source> $crate::Sealed for $type $(<$lt>)? {}
+
         impl<'source> $crate::FromToken<'source> for $type $(<$lt>)? {
+            const NAME: &'static str = stringify!($type);
             fn from_token<'borrow>(
                 token: &'borrow $crate::TokenType<'source>,
             ) -> Option<&'borrow Self> {
@@ -181,7 +184,7 @@ trait Lex: Sized {
     fn lex(s: &str) -> Result<(Token, &str), Error>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType<'source> {
     Keyword(Keyword),
     Identifier(Identifier<'source>),
@@ -191,7 +194,11 @@ pub enum TokenType<'source> {
     Semi(Semi),
 }
 
-trait FromToken<'source> {
+trait Sealed {}
+
+#[allow(private_bounds)]
+pub trait FromToken<'source>: Sealed {
+    const NAME: &'static str;
     fn from_token<'borrow>(token: &'borrow TokenType<'source>) -> Option<&'borrow Self>;
 }
 

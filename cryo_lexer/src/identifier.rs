@@ -1,6 +1,6 @@
 use cryo_span::Span;
 
-use crate::{Error, FromToken, Lex, Token, TokenType, find_token_end};
+use crate::{Error, FromToken, Lex, Sealed, Token, TokenType, find_token_end};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Identifier<'source>(pub &'source str);
@@ -34,6 +34,7 @@ impl Lex for Identifier<'_> {
 }
 
 impl<'source> FromToken<'source> for Identifier<'source> {
+    const NAME: &'static str = "Identifier";
     fn from_token<'borrow>(token: &'borrow TokenType<'source>) -> Option<&'borrow Self> {
         match token {
             TokenType::Identifier(id) => Some(id),
@@ -41,6 +42,8 @@ impl<'source> FromToken<'source> for Identifier<'source> {
         }
     }
 }
+
+impl Sealed for Identifier<'_> {}
 
 #[cfg(test)]
 mod tests {

@@ -2,6 +2,7 @@
 
 use std::fmt::{Debug, Display};
 
+use cryo_lexer::stream::TokenStreamError;
 use cryo_span::Span;
 
 pub(crate) trait ParseError {
@@ -9,6 +10,30 @@ pub(crate) trait ParseError {
     fn name(&self) -> &'static str;
     fn subcode(&self) -> u32;
     fn span(&self) -> &Span;
+}
+
+impl ParseError for TokenStreamError {
+    fn code(&self) -> u32 {
+        0
+    }
+
+    fn subcode(&self) -> u32 {
+        match self {
+            TokenStreamError::EndOfInput => 0,
+            TokenStreamError::IncorrectToken(_, _) => 1,
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "token stream error"
+    }
+
+    fn span(&self) -> &Span {
+        match self {
+            TokenStreamError::EndOfInput => &Span::ZERO,
+            TokenStreamError::IncorrectToken(_, s) => s,
+        }
+    }
 }
 
 impl PartialEq for dyn ParseError {
@@ -40,6 +65,12 @@ impl Display for dyn ParseError {
             self.subcode(),
             self.span()
         )
+    }
+}
+
+impl<T: ParseError + 'static> From<T> for Box<dyn ParseError> {
+    fn from(value: T) -> Self {
+        Box::new(value)
     }
 }
 

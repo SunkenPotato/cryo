@@ -1,7 +1,8 @@
 use cryo_span::Span;
 
 use crate::{
-    Error, FromToken, Lex, LexicalError, Token, TokenType, extract, find_token_end, token_marker,
+    Error, FromToken, Lex, LexicalError, Sealed, Token, TokenType, extract, find_token_end,
+    token_marker,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,6 +36,7 @@ impl<'source> Lex for Literal<'source> {
 pub struct StringLiteral<'source>(pub &'source str);
 
 impl<'s> FromToken<'s> for StringLiteral<'s> {
+    const NAME: &'static str = "StringLiteral";
     fn from_token<'borrow>(token: &'borrow TokenType<'s>) -> Option<&'borrow Self> {
         match Literal::from_token(token)? {
             Literal::StringLiteral(s) => Some(s),
@@ -42,6 +44,8 @@ impl<'s> FromToken<'s> for StringLiteral<'s> {
         }
     }
 }
+
+impl Sealed for StringLiteral<'_> {}
 
 impl Lex for StringLiteral<'_> {
     fn lex(s: &str) -> Result<(crate::Token, &str), crate::Error> {
@@ -91,6 +95,7 @@ impl Lex for StringLiteral<'_> {
 pub struct IntegerLiteral<'source>(pub &'source str);
 
 impl<'s> FromToken<'s> for IntegerLiteral<'s> {
+    const NAME: &'static str = "IntegerLiteral";
     fn from_token<'borrow>(token: &'borrow TokenType<'s>) -> Option<&'borrow Self> {
         match Literal::from_token(token)? {
             Literal::IntegerLiteral(v) => Some(v),
@@ -98,6 +103,8 @@ impl<'s> FromToken<'s> for IntegerLiteral<'s> {
         }
     }
 }
+
+impl Sealed for IntegerLiteral<'_> {}
 
 fn is_invalid_integer_char(c: char) -> bool {
     !matches!(c, '0'..='9' | '_')
