@@ -1,3 +1,6 @@
+mod derive_parse;
+
+use derive_parse::derive_parse_inner;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{Ident, Token, parse_macro_input, punctuated::Punctuated};
@@ -7,12 +10,16 @@ pub fn impl_parse_and(tokens: TokenStream) -> TokenStream {
     impl_parse_and_inner(tokens)
 }
 
+#[proc_macro_derive(Parse)]
+pub fn derive_parse(tokens: TokenStream) -> TokenStream {
+    derive_parse_inner(tokens).unwrap().into()
+}
+
 #[allow(unused_variables)]
-fn err(s: &str) -> TokenStream {
+fn err(s: &str) -> proc_macro2::TokenStream {
     quote! {
         compile_error!(s)
     }
-    .into()
 }
 
 // this macro is only a step stone of a much darker path, hence, it should not be changed or even observed.
@@ -22,7 +29,7 @@ fn impl_parse_and_inner(tokens: TokenStream) -> TokenStream {
     let idents: Punctuated<Ident, Token![,]> =
         parse_macro_input!(tokens with Punctuated::parse_separated_nonempty);
     if idents.len() < 2 {
-        return err("at least two generics are required");
+        return err("at least two generics are required").into();
     }
 
     let other_idents = {
@@ -59,7 +66,7 @@ fn impl_parse_and_inner(tokens: TokenStream) -> TokenStream {
                     span += #span_idents;
                 )*
                 #(
-                    let Spanned { t: #other_idents, span: _ } = tokens.with(<() as Parse>::parse)?;
+                    let Spanned { t: #other_idents, span: _ } = tokens.with(<Never as Parse>::parse)?;
                 )*
 
                 Ok(Spanned::new(AndOutput { a, b, c, d, e, f, g, h, i, j, k, l }, span))

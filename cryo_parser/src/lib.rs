@@ -3,20 +3,9 @@
 pub mod error;
 pub mod parser;
 
-use cryo_lexer::stream::TokenStream;
 use cryo_span::Spanned;
 
 type S<T> = Spanned<T>;
-type ParseResult<T> = Result<S<T>, S<Box<dyn ParseError>>>;
-
-use crate::{error::ParseError, parser::Parse};
-
-pub fn parser<T>(mut tokens: TokenStream) -> ParseResult<T::Output>
-where
-    T: Parse,
-{
-    tokens.with(T::parse)
-}
 
 #[cfg(test)]
 mod test_util {

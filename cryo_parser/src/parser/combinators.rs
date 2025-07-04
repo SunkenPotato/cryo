@@ -1,3 +1,13 @@
+use cryo_lexer::stream::TokenStreamGuard;
+use cryo_span::{Span, Spanned};
+
+#[allow(unused_imports)]
+pub use self::{
+    and::{And, AndOutput},
+    either::{Either, EitherOutput},
+};
+use crate::{parser::Parse, parser::ParseResult};
+
 macro_rules! variadic {
     ($macro:ident $(, $($bounds:ty),*)?) => {
         $macro!(A, B);
@@ -20,6 +30,16 @@ macro_rules! sealed {
     };
 }
 
+struct Sealer;
+pub struct Never(Sealer);
+
+impl Parse for Never {
+    type Output = Self;
+    fn parse(_: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
+        Ok(Spanned::new(Self(Sealer), Span::ZERO))
+    }
+}
+
 variadic!(sealed);
 
 trait Sealed {}
@@ -29,7 +49,10 @@ mod either {
 
     use cryo_lexer::stream::TokenStreamGuard;
 
-    use crate::{ParseResult, parser::combinators::Sealed};
+    use crate::{
+        parser::ParseResult,
+        parser::combinators::{Never, Sealed},
+    };
 
     use super::super::Parse;
 
@@ -68,16 +91,16 @@ mod either {
     pub enum EitherOutput<
         A,
         B,
-        C: Parse = (),
-        D: Parse = (),
-        E: Parse = (),
-        F: Parse = (),
-        G: Parse = (),
-        H: Parse = (),
-        I: Parse = (),
-        J: Parse = (),
-        K: Parse = (),
-        L: Parse = (),
+        C: Parse = Never,
+        D: Parse = Never,
+        E: Parse = Never,
+        F: Parse = Never,
+        G: Parse = Never,
+        H: Parse = Never,
+        I: Parse = Never,
+        J: Parse = Never,
+        K: Parse = Never,
+        L: Parse = Never,
     >
     where
         A: Parse,
@@ -104,7 +127,7 @@ mod either {
         type Output = A::Output;
         fn parse(
             tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-        ) -> crate::ParseResult<Self::Output> {
+        ) -> crate::parser::ParseResult<Self::Output> {
             tokens.with(A::parse)
         }
     }
@@ -113,13 +136,13 @@ mod either {
 mod and {
     use std::marker::PhantomData;
 
-    use crate::Spanned;
+    use crate::{Spanned, parser::combinators::Never};
     use cryo_lexer::stream::TokenStreamGuard;
     use cryo_parser_proc_macro::impl_parse_and;
     use cryo_span::Span;
 
     use crate::{
-        ParseResult,
+        parser::ParseResult,
         parser::{Parse, combinators::Sealed},
     };
 
@@ -146,16 +169,16 @@ mod and {
     pub struct AndOutput<
         A: Parse,
         B: Parse,
-        C: Parse = (),
-        D: Parse = (),
-        E: Parse = (),
-        F: Parse = (),
-        G: Parse = (),
-        H: Parse = (),
-        I: Parse = (),
-        J: Parse = (),
-        K: Parse = (),
-        L: Parse = (),
+        C: Parse = Never,
+        D: Parse = Never,
+        E: Parse = Never,
+        F: Parse = Never,
+        G: Parse = Never,
+        H: Parse = Never,
+        I: Parse = Never,
+        J: Parse = Never,
+        K: Parse = Never,
+        L: Parse = Never,
     > {
         pub a: A::Output,
         pub b: B::Output,

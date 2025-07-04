@@ -2,11 +2,14 @@ use cryo_lexer::{
     FromToken,
     stream::{TokenStream, TokenStreamGuard},
 };
+use cryo_parser_proc_macro::Parse;
 use cryo_span::{Span, Spanned};
 
-use crate::{ParseResult, error::ParseError};
+use crate::{S, error::ParseError};
 
 mod combinators;
+
+pub type ParseResult<T> = Result<S<T>, S<Box<dyn ParseError>>>;
 
 pub trait Parse: Sized {
     type Output;
@@ -20,6 +23,7 @@ impl Parse for () {
         Ok(Spanned::new((), Span::ZERO))
     }
 }
+
 pub fn terminal<'source, T, R, E, F>(
     stream: &mut TokenStream<'source>,
     f: F,
@@ -33,4 +37,11 @@ where
         let token = guard.advance_require()?;
         Ok(f(token)?)
     })
+}
+
+pub fn parser<T>(mut tokens: TokenStream) -> ParseResult<T::Output>
+where
+    T: Parse,
+{
+    tokens.with(T::parse)
 }
