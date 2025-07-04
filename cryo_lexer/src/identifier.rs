@@ -1,4 +1,4 @@
-use cryo_span::Span;
+use cryo_span::{Span, Spanned};
 
 use crate::{Error, FromToken, Lex, Sealed, Token, TokenType, find_token_end};
 
@@ -35,9 +35,9 @@ impl Lex for Identifier<'_> {
 
 impl<'source> FromToken<'source> for Identifier<'source> {
     const NAME: &'static str = "Identifier";
-    fn from_token<'borrow>(token: &'borrow TokenType<'source>) -> Option<&'borrow Self> {
-        match token {
-            TokenType::Identifier(id) => Some(id),
+    fn from_token<'borrow>(token: &'borrow Token<'source>) -> Option<Spanned<&'borrow Self>> {
+        match token.t {
+            TokenType::Identifier(ref id) => Some(Spanned::new(id, token.span)),
             _ => None,
         }
     }

@@ -1,4 +1,4 @@
-use cryo_span::Span;
+use cryo_span::{Span, Spanned};
 
 use crate::{
     Error, FromToken, Lex, LexicalError, Sealed, Token, TokenType, extract, find_token_end,
@@ -37,9 +37,10 @@ pub struct StringLiteral<'source>(pub &'source str);
 
 impl<'s> FromToken<'s> for StringLiteral<'s> {
     const NAME: &'static str = "StringLiteral";
-    fn from_token<'borrow>(token: &'borrow TokenType<'s>) -> Option<&'borrow Self> {
-        match Literal::from_token(token)? {
-            Literal::StringLiteral(s) => Some(s),
+    fn from_token<'borrow>(token: &'borrow Token<'s>) -> Option<Spanned<&'borrow Self>> {
+        let lit = Literal::from_token(token)?;
+        match lit.t {
+            Literal::StringLiteral(s) => Some(Spanned::new(s, lit.span)),
             _ => None,
         }
     }
@@ -96,9 +97,10 @@ pub struct IntegerLiteral<'source>(pub &'source str);
 
 impl<'s> FromToken<'s> for IntegerLiteral<'s> {
     const NAME: &'static str = "IntegerLiteral";
-    fn from_token<'borrow>(token: &'borrow TokenType<'s>) -> Option<&'borrow Self> {
-        match Literal::from_token(token)? {
-            Literal::IntegerLiteral(v) => Some(v),
+    fn from_token<'borrow>(token: &'borrow Token<'s>) -> Option<Spanned<&'borrow Self>> {
+        let lit = Literal::from_token(token)?;
+        match lit.t {
+            Literal::IntegerLiteral(s) => Some(Spanned::new(s, lit.span)),
             _ => None,
         }
     }

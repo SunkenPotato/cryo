@@ -16,6 +16,20 @@ use crate::{
 };
 
 pub type Token<'source> = Spanned<TokenType<'source>>;
+
+pub trait TokenExt<'source> {
+    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>>;
+    fn is<T: FromToken<'source>>(&self) -> bool {
+        self.require::<T>().is_some()
+    }
+}
+
+impl<'source> TokenExt<'source> for Token<'source> {
+    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>> {
+        T::from_token(self)
+    }
+}
+
 type LexFn = fn(&str) -> Result<(Token, &str), Error>;
 type Error = Spanned<LexicalError>;
 
@@ -29,10 +43,10 @@ macro_rules! token_marker {
         impl<'source> $crate::FromToken<'source> for $type $(<$lt>)? {
             const NAME: &'static str = stringify!($type);
             fn from_token<'borrow>(
-                token: &'borrow $crate::TokenType<'source>,
-            ) -> Option<&'borrow Self> {
-                match token {
-                    $crate::TokenType::$type(v) => Some(v),
+                token: &'borrow $crate::Token<'source>,
+            ) -> Option<::cryo_span::Spanned<&'borrow Self>> {
+                match token.t {
+                    $crate::TokenType::$type(ref v) => Some(::cryo_span::Spanned::new(v, token.span)),
                     _ => None,
                 }
             }
@@ -199,7 +213,7 @@ trait Sealed {}
 #[allow(private_bounds)]
 pub trait FromToken<'source>: Sealed {
     const NAME: &'static str;
-    fn from_token<'borrow>(token: &'borrow TokenType<'source>) -> Option<&'borrow Self>;
+    fn from_token<'borrow>(token: &'borrow Token<'source>) -> Option<Spanned<&'borrow Self>>;
 }
 
 impl<'s> TokenType<'s> {
@@ -212,19 +226,6 @@ impl<'s> TokenType<'s> {
         Assign::lex,
         Semi::lex,
     ];
-
-    #[allow(private_bounds)]
-    pub fn require<T>(&self) -> Option<&T>
-    where
-        T: FromToken<'s>,
-    {
-        T::from_token(self)
-    }
-
-    #[allow(private_bounds)]
-    pub fn is<T: FromToken<'s>>(&self) -> bool {
-        T::from_token(self).is_some()
-    }
 }
 
 impl Lex for TokenType<'_> {

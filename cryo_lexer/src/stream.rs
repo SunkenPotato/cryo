@@ -1,8 +1,8 @@
 use std::array;
 
-use cryo_span::Span;
+use cryo_span::{Span, Spanned};
 
-use crate::{FromToken, Token};
+use crate::{FromToken, Token, TokenExt};
 
 pub struct TokenStream<'source> {
     inner: Vec<Token<'source>>,
@@ -56,7 +56,7 @@ impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
 
     pub fn advance_require<'b, T: FromToken<'source>>(
         &'b mut self,
-    ) -> Result<&'b T, TokenStreamError> {
+    ) -> Result<Spanned<&'b T>, TokenStreamError> {
         let token = self.advance()?;
         token
             .require()
@@ -69,7 +69,7 @@ impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
 
     pub fn peek_require<T: FromToken<'source>>(
         &'stream self,
-    ) -> Result<&'stream T, TokenStreamError> {
+    ) -> Result<Spanned<&'stream T>, TokenStreamError> {
         let token = self.peek()?;
         token
             .require()

@@ -8,3 +8,4 @@ paste = "*"
 
 [dependencies]
 cryo_span = { version = "0.1.0", path = "../cryo_span" }
+sealed_trait = "0.1.1"
