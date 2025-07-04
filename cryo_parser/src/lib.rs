@@ -3,18 +3,13 @@
 pub mod error;
 pub mod parser;
 
-use cryo_lexer::stream::{TokenStream, TokenStreamGuard};
+use cryo_lexer::stream::TokenStream;
 use cryo_span::Spanned;
 
 type S<T> = Spanned<T>;
 type ParseResult<T> = Result<S<T>, S<Box<dyn ParseError>>>;
 
-use crate::error::ParseError;
-
-trait Parse: Sized {
-    type Output;
-    fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output>;
-}
+use crate::{error::ParseError, parser::Parse};
 
 pub fn parser<T>(mut tokens: TokenStream) -> ParseResult<T::Output>
 where
@@ -29,7 +24,7 @@ mod test_util {
 
     use cryo_lexer::stream::TokenStream;
 
-    use crate::{Parse, S, error::ParseError};
+    use crate::{S, error::ParseError, parser::Parse};
 
     #[track_caller]
     pub(crate) fn assert_parse<T>(mut tokens: TokenStream, expect: S<T::Output>)

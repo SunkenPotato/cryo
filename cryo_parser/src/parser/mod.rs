@@ -1,9 +1,25 @@
-use cryo_lexer::{FromToken, stream::TokenStream};
+use cryo_lexer::{
+    FromToken,
+    stream::{TokenStream, TokenStreamGuard},
+};
+use cryo_span::{Span, Spanned};
 
-use crate::error::ParseError;
+use crate::{ParseResult, error::ParseError};
 
 mod combinators;
 
+pub trait Parse: Sized {
+    type Output;
+    fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output>;
+}
+
+impl Parse for () {
+    type Output = Self;
+
+    fn parse(_: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
+        Ok(Spanned::new((), Span::ZERO))
+    }
+}
 pub fn terminal<'source, T, R, E, F>(
     stream: &mut TokenStream<'source>,
     f: F,

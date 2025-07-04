@@ -129,6 +129,10 @@ impl<T> Spanned<T> {
         self.span = self.span.offset(offset);
         self
     }
+
+    pub fn tuple(self) -> (T, Span) {
+        (self.t, self.span)
+    }
 }
 
 impl<T> Deref for Spanned<T> {

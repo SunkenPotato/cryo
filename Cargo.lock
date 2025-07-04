@@ -27,7 +27,16 @@ name = "cryo_parser"
 version = "0.1.0"
 dependencies = [
  "cryo_lexer",
+ "cryo_parser_proc_macro",
  "cryo_span",
+]
+
+[[package]]
+name = "cryo_parser_proc_macro"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
