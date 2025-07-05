@@ -1,3 +1,5 @@
+//! Derive and procedural macros for the `cryo_parser` crate.
+
 mod derive_parse;
 
 use derive_parse::derive_parse_inner;
@@ -5,11 +7,19 @@ use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{Ident, Token, parse_macro_input, punctuated::Punctuated};
 
+/// Implement `ParseAnd` for a given tuple. This is constrained to tuples with the length 12.
 #[proc_macro]
 pub fn impl_parse_and(tokens: TokenStream) -> TokenStream {
     impl_parse_and_inner(tokens)
 }
 
+/// Derive the `Parse` trait for a type.
+///
+/// If an `enum` is annotated with `derive(Parse)`, the generated implementation of `Parse` will try to parse the variants of the enum in the order that they are defined with their implementation of the `Parse` trait.
+/// The first operation to succeed will be used.
+///
+/// If a `struct` is annotated with `derive(Parse)`, the generated implementation of `Parse` will try to parse the individual fields sequentially in the order that they are defined with their implentation of the `Parse` trait.
+/// Therefore, parsing will only succeed if all provided components can be parsed one after another.
 #[proc_macro_derive(Parse)]
 pub fn derive_parse(tokens: TokenStream) -> TokenStream {
     derive_parse_inner(tokens).unwrap().into()
