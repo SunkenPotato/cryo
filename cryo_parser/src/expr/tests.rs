@@ -1,7 +1,11 @@
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    expr::literal::{IntegerLiteral, StringLiteral},
+    expr::{
+        Expr, ReducedExpr,
+        literal::{IntegerLiteral, Literal, StringLiteral},
+        math_expr::{MathExpr, Operator},
+    },
     test_util::{TestError, assert_parse, assert_parse_fail, stream},
 };
 
@@ -29,6 +33,30 @@ fn parse_str_lit() {
         Spanned::new(
             StringLiteral(String::from("Hello, \"world\"")),
             Span::new(0, 18),
+        ),
+    );
+}
+
+#[test]
+fn parse_op() {
+    let stream = stream("+");
+    assert_parse::<Operator>(stream, Spanned::new(Operator::Add, Span::new(0, 1)))
+}
+
+#[test]
+fn parse_math_expr() {
+    let stream = stream("5 + 4");
+    assert_parse::<MathExpr>(
+        stream,
+        Spanned::new(
+            MathExpr {
+                lhs: ReducedExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(5))),
+                op: super::math_expr::Operator::Add,
+                rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
+                    IntegerLiteral(4),
+                ))),
+            },
+            Span::new(0, 5),
         ),
     );
 }

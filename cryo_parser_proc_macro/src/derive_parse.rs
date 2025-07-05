@@ -51,7 +51,7 @@ fn derive_parse_inner_enum(input: DeriveInput) -> syn::Result<TokenStream2> {
             type Output = Self;
 
             fn parse(tokens: &mut ::cryo_lexer::stream::TokenStreamGuard) -> crate::parser::ParseResult<Self::Output> {
-                crate::parser::combinators::Either::<(#(#types0),*)>::parse(tokens).map(|v| v.map(Into::into))
+                crate::parser::combinators::Either::<(#(#types0,)*)>::parse(tokens).map(|v| v.map(Into::into))
             }
         }
 
@@ -120,7 +120,7 @@ fn derive_parse_inner_struct(input: DeriveInput) -> syn::Result<TokenStream2> {
             type Output = Self;
 
             fn parse(tokens: &mut ::cryo_lexer::stream::TokenStreamGuard) -> crate::parser::ParseResult<Self::Output> {
-                <crate::parser::combinators::And::<(#(#types0),*)> as crate::parser::Parse>::parse(tokens).map(|v| v.map(Into::into))
+                <crate::parser::combinators::And::<(#(#types0,)*)> as crate::parser::Parse>::parse(tokens).map(|v| v.map(Into::into))
             }
         }
 

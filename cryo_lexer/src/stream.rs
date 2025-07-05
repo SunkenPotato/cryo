@@ -34,6 +34,7 @@ impl<'source> TokenStream<'source> {
     }
 }
 
+#[cfg_attr(test, derive(Debug, PartialEq))] // only for tests, since all externals use dyn ParseError
 pub enum TokenStreamError {
     EndOfInput,
     IncorrectToken(&'static str, Span),
@@ -46,15 +47,24 @@ pub struct TokenStreamGuard<'stream, 'source> {
     cursor: usize,
 }
 
+impl std::fmt::Debug for TokenStreamGuard<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TokenStreamGuard")
+            .field("inner", &&self.stream.inner[self.cursor..])
+            .finish()
+    }
+}
+
 impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
     pub fn advance<'b>(&'b mut self) -> Result<&'b Token<'source>, TokenStreamError> {
         self.stream
             .inner
-            .first()
+            .get(self.cursor)
             .inspect(|_| self.cursor += 1)
             .ok_or(EOI)
     }
 
+    #[track_caller]
     pub fn advance_require<'b, T: FromToken<'source>>(
         &'b mut self,
     ) -> Result<Spanned<&'b T>, TokenStreamError> {
@@ -65,7 +75,7 @@ impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
     }
 
     pub fn peek(&'stream self) -> Result<&'stream Token<'source>, TokenStreamError> {
-        self.stream.inner.first().ok_or(EOI)
+        self.stream.inner.get(self.cursor).ok_or(EOI)
     }
 
     pub fn peek_require<T: FromToken<'source>>(
@@ -78,7 +88,7 @@ impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
     }
 
     pub fn peek_n(&'stream self, idx: usize) -> Result<&'stream Token<'source>, TokenStreamError> {
-        self.stream.inner.get(idx).ok_or(EOI)
+        self.stream.inner.get(self.cursor + idx).ok_or(EOI)
     }
 
     pub fn peek_slice_n<const N: usize>(
@@ -99,5 +109,49 @@ impl<'stream, 'source> TokenStreamGuard<'stream, 'source> {
         }
 
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(unused_must_use)]
+    use cryo_span::Span;
+
+    use crate::{
+        Token, TokenType,
+        atoms::{Assign, Semi},
+        stream::{TokenStream, TokenStreamError},
+    };
+
+    #[test]
+    fn consume_stream() {
+        // Span::ZERO since the spans aren't important
+        let mut stream = TokenStream::new(vec![
+            Token::new(TokenType::Assign(Assign), Span::ZERO),
+            Token::new(TokenType::Semi(Semi), Span::ZERO),
+            Token::new(TokenType::Keyword(crate::atoms::Keyword::Let), Span::ZERO),
+        ]);
+
+        stream.with(|guard| {
+            assert_eq!(
+                guard.advance(),
+                Ok(&Token::new(
+                    TokenType::Keyword(crate::atoms::Keyword::Let),
+                    Span::ZERO
+                ))
+            );
+
+            assert_eq!(
+                guard.advance(),
+                Ok(&Token::new(TokenType::Semi(Semi), Span::ZERO))
+            );
+
+            assert_eq!(
+                guard.advance(),
+                Ok(&Token::new(TokenType::Assign(Assign), Span::ZERO))
+            );
+
+            Ok::<(), TokenStreamError>(())
+        });
     }
 }

@@ -9,7 +9,8 @@ pub use self::{
 use crate::{parser::Parse, parser::ParseResult};
 
 macro_rules! variadic {
-    ($macro:ident $(, $($bounds:ty),*)?) => {
+    ($macro:ident) => {
+        $macro!(A);
         $macro!(A, B);
         $macro!(A, B, C);
         $macro!(A, B, C, D);
@@ -57,20 +58,19 @@ mod either {
     use super::super::Parse;
 
     macro_rules! impl_parse_either {
-        ($a:ident, $b:ident $(,)? $($t:ident),*) => {
-            impl<$a, $b, $($t,)*> ParseEither for ($a, $b, $($t,)*)
+        ($a:ident $(,$($t:ident),+)?) => {
+            impl<$a $(,$($t),+)?> ParseEither for ($a, $($($t),+)?)
             where
-                $a: Parse,
-                $b: Parse,
-                $($t: Parse,)*
+                $a: Parse
+                $(,$($t: Parse),+)?
             {
-                type Output = EitherOutput<$a, $b, $($t,)*>;
+                type Output = EitherOutput<$a $(,$($t),+)?>;
 
                 fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
-                    tokens.with($a::parse).map(|v| v.map(EitherOutput::$a)).or_else(|_| tokens.with($b::parse).map(|v| v.map(EitherOutput::$b)))
-                    $(
+                    tokens.with($a::parse).map(|v| v.map(EitherOutput::$a))
+                    $($(
                         .or_else(|_| tokens.with($t::parse).map(|v| v.map(EitherOutput::$t)))
-                    )*
+                    )+)?
                 }
             }
         }
@@ -89,8 +89,8 @@ mod either {
     }
 
     pub enum EitherOutput<
-        A,
-        B,
+        A: Parse,
+        B: Parse = Never,
         C: Parse = Never,
         D: Parse = Never,
         E: Parse = Never,
@@ -101,11 +101,7 @@ mod either {
         J: Parse = Never,
         K: Parse = Never,
         L: Parse = Never,
-    >
-    where
-        A: Parse,
-        B: Parse,
-    {
+    > {
         A(A::Output),
         B(B::Output),
         C(C::Output),
@@ -168,7 +164,7 @@ mod and {
     #[allow(unused)]
     pub struct AndOutput<
         A: Parse,
-        B: Parse,
+        B: Parse = Never,
         C: Parse = Never,
         D: Parse = Never,
         E: Parse = Never,

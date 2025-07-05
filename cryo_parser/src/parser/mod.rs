@@ -24,6 +24,14 @@ impl Parse for () {
     }
 }
 
+impl<T: Parse> Parse for Box<T> {
+    type Output = Box<T::Output>;
+
+    fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
+        T::parse(tokens).map(|v| v.map(Box::new))
+    }
+}
+
 pub fn terminal<'source, T, R, E, F>(
     stream: &mut TokenStream<'source>,
     f: F,

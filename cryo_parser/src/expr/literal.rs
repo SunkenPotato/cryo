@@ -12,7 +12,7 @@ parse_error! {
     }
 }
 
-#[derive(Parse)]
+#[derive(Parse, Debug, PartialEq)]
 pub enum Literal {
     IntegerLiteral(IntegerLiteral),
     StringLiteral(StringLiteral),

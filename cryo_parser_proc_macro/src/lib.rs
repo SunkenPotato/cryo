@@ -18,7 +18,7 @@ pub fn derive_parse(tokens: TokenStream) -> TokenStream {
 #[allow(unused_variables)]
 fn err(s: &str) -> proc_macro2::TokenStream {
     quote! {
-        compile_error!(s)
+        compile_error!(#s)
     }
 }
 
@@ -28,9 +28,6 @@ fn err(s: &str) -> proc_macro2::TokenStream {
 fn impl_parse_and_inner(tokens: TokenStream) -> TokenStream {
     let idents: Punctuated<Ident, Token![,]> =
         parse_macro_input!(tokens with Punctuated::parse_separated_nonempty);
-    if idents.len() < 2 {
-        return err("at least two generics are required").into();
-    }
 
     let other_idents = {
         let last_ident = idents[idents.len() - 1].to_string();
@@ -53,8 +50,8 @@ fn impl_parse_and_inner(tokens: TokenStream) -> TokenStream {
     let span_idents = idents.iter().map(|v| format_ident!("{}_span", v));
 
     let output = quote! {
-        impl<#(#iter),*> ParseAnd for (#(#iter2),*)
-        where #(#iter6: Parse),*
+        impl<#(#iter,)*> ParseAnd for (#(#iter2,)*)
+        where #(#iter6: Parse,)*
         {
             type Output = AndOutput<#(#iter3),*>;
 
@@ -62,6 +59,7 @@ fn impl_parse_and_inner(tokens: TokenStream) -> TokenStream {
             fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
                 let mut span = Span::ZERO;
                 #(
+
                     let Spanned { t: #iter4, span: #span_idents } = tokens.with(#iter5::parse)?;
                     span += #span_idents;
                 )*
