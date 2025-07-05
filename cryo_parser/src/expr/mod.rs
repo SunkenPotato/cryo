@@ -1,6 +1,10 @@
 pub mod literal;
+#[cfg(test)]
+mod tests;
 
 use cryo_parser_proc_macro::Parse;
+
+use crate::expr::literal::Literal;
 
 // #[derive(Parse)]
 pub enum Expr {
@@ -9,4 +13,6 @@ pub enum Expr {
 }
 
 // #[derive(Parse)]
-pub enum ReducedExpr {}
+pub enum ReducedExpr {
+    Literal(Literal),
+}

@@ -36,8 +36,8 @@ impl ParseError for TokenStreamError {
     }
 }
 
-impl PartialEq for dyn ParseError {
-    fn eq(&self, other: &Self) -> bool {
+impl<T: ParseError + ?Sized> PartialEq<T> for dyn ParseError {
+    fn eq(&self, other: &T) -> bool {
         (self.code() == other.code()) && (self.subcode() == other.subcode())
     }
 }
@@ -89,8 +89,8 @@ macro_rules! parse_error {
         $visibility:vis enum $identifier:ident {
             $(
                 $(#[$var_attr:meta])*
-                #($var_code:expr, $fmt_str:expr, $($fmt_args:expr,)*)
-                $variant:ident $(( $($var_field_name:ident: $var_field:ident,)+ ))?,
+                #($var_code:expr, $fmt_str:expr, $($fmt_args:expr),*)
+                $variant:ident $(( $($var_field_name:ident: $var_field:ident),+ ))?,
             )+
         }
     ) => {
@@ -102,7 +102,7 @@ macro_rules! parse_error {
             )+
         }
 
-        impl $crate::ParseError for $crate::S<$identifier> {
+        impl $crate::error::ParseError for $crate::S<$identifier> {
             fn code(&self) -> u32 {
                 $code
             }
@@ -128,7 +128,7 @@ macro_rules! parse_error {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}", match self {
                     $(
-                        Self::$variant $(( $($var_field,)+ ))? => format!($fmt_str, $($fmt_args,)*),
+                        Self::$variant $(( $($var_field_name,)+ ))? => format!($fmt_str, $($fmt_args,)*),
                     )+
                 })
             }
@@ -146,7 +146,7 @@ macro_rules! parse_error {
         }
     ) => {
         const _: () = {
-            const fn __a<T: $crate::ParseError>() {}
+            const fn __a<T: $crate::error::ParseError>() {}
             $(
                 __a::<$crate::S<$variant_type>>();
             )*
@@ -159,7 +159,7 @@ macro_rules! parse_error {
             )+
         }
 
-        impl $crate::ParseError for $identifier {
+        impl $crate::error::ParseError for $identifier {
             fn code(&self) -> u32 {
                 match self {
                     $(
@@ -188,18 +188,18 @@ macro_rules! parse_error {
                 match self {
                     $(
                         Self::$variant(v) => v.span()
-                    )*
+                    ),*
                 }
             }
         }
 
         impl std::fmt::Display for $identifier {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}", match self {
+                match self {
                     $(
-                        Self::$variant(v) => v,
+                        Self::$variant(v) => write!(f, "{v}"),
                     )*
-                })
+                }
             }
         }
     }

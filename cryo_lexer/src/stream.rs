@@ -4,6 +4,7 @@ use cryo_span::{Span, Spanned};
 
 use crate::{FromToken, Token, TokenExt};
 
+#[derive(Clone, Debug)]
 pub struct TokenStream<'source> {
     inner: Vec<Token<'source>>,
 }

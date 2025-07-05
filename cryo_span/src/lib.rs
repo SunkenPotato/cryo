@@ -15,15 +15,10 @@ pub use tests::TempFile;
 
 static SOURCE_MAP: OnceLock<SourceMap> = OnceLock::new();
 
-#[inline]
-pub(crate) fn get_source_map() -> &'static SourceMap {
-    SOURCE_MAP.get().expect("SourceMap should be initialized")
-}
-
 pub fn initialize(map: SourceMap) -> Result<&'static SourceMap, SourceMap> {
     SOURCE_MAP.set(map)?;
 
-    Ok(get_source_map())
+    Ok(SOURCE_MAP.get().unwrap())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -75,8 +70,15 @@ impl AddAssign for Span {
 impl Display for Span {
     // TODO: replace unwraps.
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let instance = get_source_map();
-        let file = instance.get(self.file.into()).unwrap();
+        let Some(instance) = SOURCE_MAP.get() else {
+            write!(f, "failed to get source map")?;
+            return Ok(());
+        };
+
+        let Some(file) = instance.get(self.file.into()) else {
+            write!(f, "unable to find source file with index {}", self.file)?;
+            return Ok(());
+        };
 
         let path = &file.file;
         let ((start_line, start_col), (end_line, end_col)) = (

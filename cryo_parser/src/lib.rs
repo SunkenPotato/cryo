@@ -1,6 +1,7 @@
 #![allow(private_bounds, private_interfaces)]
 
 pub mod error;
+pub mod expr;
 pub mod parser;
 
 use cryo_span::Spanned;
@@ -11,7 +12,7 @@ type S<T> = Spanned<T>;
 mod test_util {
     use std::fmt::Debug;
 
-    use cryo_lexer::stream::TokenStream;
+    use cryo_lexer::{lexer, stream::TokenStream};
 
     use crate::{S, error::ParseError, parser::Parse};
 
@@ -62,7 +63,7 @@ mod test_util {
     }
 
     #[track_caller]
-    pub(crate) fn assert_parse_fail<T>(mut tokens: TokenStream, expect: TestError)
+    pub(crate) fn assert_parse_fail<T>(mut tokens: TokenStream, expect: impl ParseError + Debug)
     where
         T: Parse,
         T::Output: Debug,
@@ -70,7 +71,12 @@ mod test_util {
         let result = tokens.with(T::parse);
         match result {
             Ok(v) => panic!("parsing succeded: {v:?}"),
-            Err(e) => assert_eq!(&*e.t, &expect as &dyn ParseError),
+            Err(e) => assert_eq!(&*e, &expect),
         }
+    }
+
+    #[track_caller]
+    pub(crate) fn stream(input: &str) -> TokenStream {
+        TokenStream::new(lexer(input).unwrap())
     }
 }

@@ -20,6 +20,7 @@ version = "0.1.0"
 dependencies = [
  "cryo_span",
  "paste",
+ "sealed_trait",
 ]
 
 [[package]]
@@ -29,6 +30,7 @@ dependencies = [
  "cryo_lexer",
  "cryo_parser_proc_macro",
  "cryo_span",
+ "itertools",
 ]
 
 [[package]]
@@ -49,6 +51,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "either"
+version = "1.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
+
+[[package]]
 name = "getrandom"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -58,6 +66,15 @@ dependencies = [
  "libc",
  "r-efi",
  "wasi",
+]
+
+[[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
 ]
 
 [[package]]
@@ -138,6 +155,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "sealed_trait"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "458ff2caeb321b63d0e94b45c62b9587d18a16bb06f43930d91be095402c9041"
+dependencies = [
+ "paste",
 ]
 
 [[package]]
