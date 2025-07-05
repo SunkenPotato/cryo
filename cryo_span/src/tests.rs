@@ -9,9 +9,11 @@ use crate::source_map::{SourceFile, SourceMap};
 
 static INPUT: &str = "Hello\nworld\n!\n;";
 
+/// A temporary file which is deleted when dropped.
 pub struct TempFile(File, PathBuf);
 
 impl TempFile {
+    /// Create a temporary file with a random name.
     pub fn create() -> Self {
         let id = rand::random::<u32>();
         let path = PathBuf::from(id.to_string());
@@ -19,6 +21,7 @@ impl TempFile {
         Self(File::create(&path).unwrap(), path)
     }
 
+    /// Create a temporary file with a random name and the given contents.
     pub fn new(s: &str) -> Self {
         let mut f = Self::create();
 

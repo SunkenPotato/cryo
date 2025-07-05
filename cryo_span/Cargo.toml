@@ -3,6 +3,9 @@ name = "cryo_span"
 version = "0.1.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 memchr = "2.7.5"
 

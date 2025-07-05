@@ -1,3 +1,7 @@
+//! Source maps.
+//!
+//! Source maps are a list of source files used for operations like displaying the content a span refers to.
+
 use std::{
     fs::File,
     io::{self, BufReader, Read, Seek},
@@ -105,12 +109,18 @@ impl SourceFile {
     }
 }
 
+/// A source map.
+///
+/// Source maps cannot be altered once created.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SourceMap {
     pub(crate) files: MonotonicVec<SourceFile>,
 }
 
 impl SourceMap {
+    /// Create a [`SourceMap`] from a list of file paths.
+    ///
+    /// Note: this function will use threads.
     pub fn from_paths(paths: &[&Path]) -> std::io::Result<Self> {
         let files = thread::scope(|s| {
             let (sender, receiver) =
