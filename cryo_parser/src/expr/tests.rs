@@ -24,7 +24,6 @@ fn do_not_parse_int_overflow() {
 #[test]
 fn parse_str_lit() {
     let stream = stream("\"Hello, \\\"world\\\"\"");
-    dbg!(0);
     assert_parse::<StringLiteral>(
         stream,
         Spanned::new(
