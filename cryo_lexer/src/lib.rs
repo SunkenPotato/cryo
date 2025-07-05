@@ -1,39 +1,9 @@
+//! The lexer implementation for the `cryo` language.
+//!
+//! A lexer will take an input and split the input into [`Token`]s comprehensible by the parser without modifying the inputs.
+
 #![feature(array_try_map)]
 
-pub mod atoms;
-pub mod identifier;
-pub mod literal;
-pub mod stream;
-
-use std::fmt::Display;
-
-use cryo_span::{Span, Spanned};
-
-use crate::{
-    atoms::{Assign, Keyword, Operator, Semi},
-    identifier::Identifier,
-    literal::Literal,
-};
-
-pub type Token<'source> = Spanned<TokenType<'source>>;
-
-pub trait TokenExt<'source> {
-    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>>;
-    fn is<T: FromToken<'source>>(&self) -> bool {
-        self.require::<T>().is_some()
-    }
-}
-
-impl<'source> TokenExt<'source> for Token<'source> {
-    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>> {
-        T::from_token(self)
-    }
-}
-
-type LexFn = fn(&str) -> Result<(Token, &str), Error>;
-type Error = Spanned<LexicalError>;
-
-#[macro_export]
 macro_rules! token_marker {
     (
         $type:ident $(<$lt:tt>)?
@@ -54,6 +24,44 @@ macro_rules! token_marker {
     };
 }
 
+pub mod atoms;
+pub mod identifier;
+pub mod literal;
+pub mod stream;
+
+use std::fmt::Display;
+
+use cryo_span::{Span, Spanned};
+
+use crate::{
+    atoms::{Assign, Keyword, Operator, Semi},
+    identifier::Identifier,
+    literal::Literal,
+    stream::TokenStream,
+};
+
+/// A token. Contains a [`Span`] and a [`TokenType`].
+pub type Token<'source> = Spanned<TokenType<'source>>;
+
+/// Extension trait for `Spanned<TokenType>` (a.k.a., [`Token`]).
+pub trait TokenExt<'source> {
+    /// Attempt to reinterpret `self` as `T` using [`FromToken`].
+    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>>;
+    /// Checks whether `self` can be reinterpreted as `T`.
+    fn is<T: FromToken<'source>>(&self) -> bool {
+        self.require::<T>().is_some()
+    }
+}
+
+impl<'source> TokenExt<'source> for Token<'source> {
+    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>> {
+        T::from_token(self)
+    }
+}
+
+type LexFn = fn(&str) -> Result<(Token, &str), Error>;
+type Error = Spanned<LexicalError>;
+
 #[macro_export]
 #[doc(hidden)]
 macro_rules! atom {
@@ -69,7 +77,7 @@ macro_rules! atom {
             }
         }
 
-        $crate::token_marker!($identifier);
+        token_marker!($identifier);
 
         #[cfg(test)]
         ::paste::paste! {
@@ -106,16 +114,18 @@ macro_rules! atom {
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         $visibility enum $identifier {
             $(
-                $($variant_attr)*
+                $(#[$variant_attr])*
                 $variant,
             )*
         }
 
         impl $identifier {
+            #[doc = concat!("The variants ", stringify!($identifier), " may have")]
             $visibility const VARIANTS: &[Self] = &[$(
                 Self::$variant,
             )*];
 
+            #[doc = concat!("Return the string this variant would be able to be parsed from")]
             $visibility const fn as_str(&self) -> &str {
                 match self {
                     $(
@@ -139,7 +149,7 @@ macro_rules! atom {
             }
         }
 
-        $crate::token_marker!($identifier);
+        token_marker!($identifier);
 
         #[cfg(test)]
         ::paste::paste! {
@@ -169,6 +179,7 @@ macro_rules! atom {
     }
 }
 
+/// Split an input string while the supplied function returns `false`.
 pub fn extract(s: &str, f: impl Fn(char) -> bool) -> (&str, &str) {
     let end = s
         .char_indices()
@@ -198,21 +209,31 @@ trait Lex: Sized {
     fn lex(s: &str) -> Result<(Token, &str), Error>;
 }
 
+/// The possible types a token may be. `'source` refers to the lifetime of the input given to the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType<'source> {
+    /// A keyword.
     Keyword(Keyword),
+    /// An identifier.
     Identifier(Identifier<'source>),
+    /// A literal.
     Literal(Literal<'source>),
+    /// An arithmetic operator.
     Operator(Operator),
+    /// An assign token (`=`).
     Assign(Assign),
+    /// A semicolon (`;`).
     Semi(Semi),
 }
 
 trait Sealed {}
 
+/// Trait for attempting to convert `Token`s into concrete types.
 #[allow(private_bounds)]
 pub trait FromToken<'source>: Sealed {
+    /// The name of the token.
     const NAME: &'static str;
+    /// Attempt to convert a given token into `Self`.
     fn from_token<'borrow>(token: &'borrow Token<'source>) -> Option<Spanned<&'borrow Self>>;
 }
 
@@ -240,11 +261,16 @@ impl Lex for TokenType<'_> {
     }
 }
 
+/// Errors that may occur during lexing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LexicalError {
+    /// An expected sequence was not found.
     SequenceNotFound(&'static str),
+    /// An invalid sequence was not found.
     InvalidSequence,
+    /// An unexpected end of input was reached.
     EndOfInput,
+    /// The lexer could not convert the supplied input into any tokens.
     NoMatch,
 }
 
@@ -262,7 +288,11 @@ impl Display for LexicalError {
     }
 }
 
-pub fn lexer(input: &str) -> Result<Vec<Token>, Error> {
+/// The whole point.
+///
+/// The function will attempt to convert the supplied input into tokens and return a [`TokenStream`] which can be used to inspect the tokens generated. \
+/// If it fails, the function will return a spanned [`LexicalError`] pointing to where the erroneous input is.
+pub fn lexer(input: &str) -> Result<TokenStream, Error> {
     let mut tokens = vec![];
     let mut loop_input = input.trim();
     let mut cursor = input.len() - loop_input.len();
@@ -281,7 +311,7 @@ pub fn lexer(input: &str) -> Result<Vec<Token>, Error> {
         loop_input = trimmed_rest;
     }
 
-    Ok(tokens)
+    Ok(TokenStream::new(tokens))
 }
 
 #[cfg(test)]
@@ -316,6 +346,6 @@ mod tests {
             Token::new(TokenType::Semi(Semi), Span::new(24, 25)),
         ];
 
-        assert_eq!(lexer(input).unwrap(), expected)
+        assert_eq!(lexer(input).unwrap().inner, expected)
     }
 }

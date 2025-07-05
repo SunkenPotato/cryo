@@ -1,7 +1,14 @@
+//! Identifiers.
+//!
+//! View [`Identifier`] for more information.
+
 use cryo_span::{Span, Spanned};
 
 use crate::{Error, FromToken, Lex, Sealed, Token, TokenType, find_token_end};
 
+/// An identifier.
+///
+/// Identifiers are tokens used to identify bindings, functions, or structures. One may also view them as names.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Identifier<'source>(pub &'source str);
 

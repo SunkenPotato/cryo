@@ -1,13 +1,19 @@
+//! A literal.
+//!
+//! Literals are tokens which do not require any further computation and are direct, primitive values.
+
 use cryo_span::{Span, Spanned};
 
 use crate::{
     Error, FromToken, Lex, LexicalError, Sealed, Token, TokenType, extract, find_token_end,
-    token_marker,
 };
 
+/// A literal. View the module-level docs for more information.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Literal<'source> {
+    /// A string literal.
     StringLiteral(StringLiteral<'source>),
+    /// An integer literal.
     IntegerLiteral(IntegerLiteral<'source>),
 }
 
@@ -32,6 +38,11 @@ impl<'source> Lex for Literal<'source> {
     }
 }
 
+/// A string literal such as `"hello, world"`.
+///
+/// String literals support escapes such as `\"` and the null escape `\0`. They are however, unescaped by the parser.
+///
+/// String literals are delimited by the token `"`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StringLiteral<'source>(pub &'source str);
 
@@ -92,6 +103,12 @@ impl Lex for StringLiteral<'_> {
     }
 }
 
+/// An integer literal, i.e., a number, e.g. `1` or `-3`.
+///
+/// Integer literals support separators in the form of underscores (`_`) and negation signs in the form of a hyphen (`-`).
+///
+/// Integer literals may not begin or end with a separator and may not contain negation signs anywhere but in the front.
+/// A variable number of both negation signs and separators are supported where they are valid.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct IntegerLiteral<'source>(pub &'source str);
 
