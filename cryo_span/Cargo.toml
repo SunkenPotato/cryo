@@ -7,6 +7,7 @@ edition = "2024"
 workspace = true
 
 [dependencies]
+index_vec = "0.1.4"
 memchr = "2.7.5"
 
 [dev-dependencies]
