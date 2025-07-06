@@ -186,10 +186,7 @@ mod tests {
         stream.with(|guard| {
             assert_eq!(
                 guard.advance(),
-                Ok(&Token::new(
-                    TokenType::Keyword(crate::atoms::Keyword::Let),
-                    Span::ZERO
-                ))
+                Ok(&Token::new(TokenType::Assign(Assign), Span::ZERO))
             );
 
             assert_eq!(
@@ -199,7 +196,10 @@ mod tests {
 
             assert_eq!(
                 guard.advance(),
-                Ok(&Token::new(TokenType::Assign(Assign), Span::ZERO))
+                Ok(&Token::new(
+                    TokenType::Keyword(crate::atoms::Keyword::Let),
+                    Span::ZERO
+                ))
             );
 
             Ok::<(), TokenStreamError>(())

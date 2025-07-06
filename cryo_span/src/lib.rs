@@ -23,6 +23,8 @@ pub use tests::TempFile;
 ///
 /// ## Examples
 /// ```rust
+/// use cryo_span::Span;
+///
 /// Span::new(0, 20);
 /// ```
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
