@@ -5,7 +5,6 @@
 use std::{
     fmt::{Display, Formatter},
     ops::{Add, AddAssign, Deref, DerefMut},
-    sync::OnceLock,
 };
 
 use crate::source_map::SourceMap;
@@ -17,29 +16,6 @@ mod tests;
 
 #[cfg(test)]
 pub use tests::TempFile;
-
-// TODO: get rid of this
-static SOURCE_MAP: OnceLock<SourceMap> = OnceLock::new();
-
-/// Initialise the library `SourceMap`. It cannot be changed once initialised.
-///
-/// Required for operations such as [`Span`] formatting to work.
-///
-/// ## Examples
-/// ```rust
-/// use cryo_span::source_map::SourceMap;
-///
-/// let source_map = SourceMap::from_paths(&[][..]).unwrap();
-///
-/// assert_matches!(cryo_span::initialise(source_map).clone(), Ok(_));
-/// assert_matches!(cryo_span::initialise(source_map), Err(_));
-/// ```
-// TODO: remove this function and instead force [`Span`] to use a specialised display struct with a reference to a sourcemap.
-pub fn initialise(map: SourceMap) -> Result<&'static SourceMap, SourceMap> {
-    SOURCE_MAP.set(map)?;
-
-    Ok(SOURCE_MAP.get().unwrap())
-}
 
 /// A span.
 ///
@@ -88,6 +64,15 @@ impl Span {
 
         self
     }
+
+    /// Obtain an interface which can display [`Span`]s.
+    #[allow(private_interfaces)]
+    pub const fn display<'span, 'map>(
+        &'span self,
+        map: &'map SourceMap,
+    ) -> SpanDisplay<'span, 'map> {
+        SpanDisplay(self, map)
+    }
 }
 
 impl Add for Span {
@@ -105,26 +90,23 @@ impl AddAssign for Span {
     }
 }
 
-impl Display for Span {
+struct SpanDisplay<'span, 'map>(&'span Span, &'map SourceMap);
+
+impl Display for SpanDisplay<'_, '_> {
     // TODO: replace unwraps.
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Some(instance) = SOURCE_MAP.get() else {
-            write!(f, "failed to get source map")?;
-            return Ok(());
-        };
-
-        let Some(file) = instance.get(self.file.into()) else {
-            write!(f, "unable to find source file with index {}", self.file)?;
+        let Some(file) = self.1.get(self.0.file.into()) else {
+            write!(f, "unable to find source file with index {}", self.0.file)?;
             return Ok(());
         };
 
         let path = &file.file;
         let ((start_line, start_col), (end_line, end_col)) = (
-            file.line_col(self.start).unwrap(),
-            file.line_col(self.stop).unwrap(),
+            file.line_col(self.0.start).unwrap(),
+            file.line_col(self.0.stop).unwrap(),
         );
 
-        let source = file.resolve_source(self.start, self.stop).unwrap();
+        let source = file.resolve_source(self.0.start, self.0.stop).unwrap();
 
         write!(
             f,
@@ -187,6 +169,15 @@ impl<T> Spanned<T> {
     pub fn tuple(self) -> (T, Span) {
         (self.t, self.span)
     }
+
+    /// Obtain an interface which implements [`Display`].
+    #[allow(private_interfaces)]
+    pub const fn display<'span, 'map>(
+        &'span self,
+        map: &'map SourceMap,
+    ) -> SpannedDisplay<'span, 'map, T> {
+        SpannedDisplay(self, map)
+    }
 }
 
 impl<T> Deref for Spanned<T> {
@@ -203,8 +194,10 @@ impl<T> DerefMut for Spanned<T> {
     }
 }
 
-impl<T: Display> Display for Spanned<T> {
+struct SpannedDisplay<'span, 'map, T>(&'span Spanned<T>, &'map SourceMap);
+
+impl<T: Display> Display for SpannedDisplay<'_, '_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} @ {}", self.t, self.span)
+        write!(f, "{} @ {}", self.0.t, self.0.span.display(self.1))
     }
 }
