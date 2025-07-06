@@ -90,7 +90,8 @@ impl AddAssign for Span {
     }
 }
 
-struct SpanDisplay<'span, 'map>(&'span Span, &'map SourceMap);
+/// Provides an interface which implements [`Display`].
+pub struct SpanDisplay<'span, 'map>(&'span Span, &'map SourceMap);
 
 impl Display for SpanDisplay<'_, '_> {
     // TODO: replace unwraps.
@@ -194,7 +195,8 @@ impl<T> DerefMut for Spanned<T> {
     }
 }
 
-struct SpannedDisplay<'span, 'map, T>(&'span Spanned<T>, &'map SourceMap);
+/// Provides access to a display implementation for `Spanned<T>`.
+pub struct SpannedDisplay<'span, 'map, T>(&'span Spanned<T>, &'map SourceMap);
 
 impl<T: Display> Display for SpannedDisplay<'_, '_, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

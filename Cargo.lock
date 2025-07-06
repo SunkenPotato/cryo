@@ -31,6 +31,7 @@ dependencies = [
  "cryo_parser_proc_macro",
  "cryo_span",
  "itertools",
+ "paste",
 ]
 
 [[package]]

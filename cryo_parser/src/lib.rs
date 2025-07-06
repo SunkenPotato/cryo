@@ -16,6 +16,7 @@ mod test_util {
     use std::fmt::Debug;
 
     use cryo_lexer::{lexer, stream::TokenStream};
+    use cryo_span::source_map::SourceMap;
 
     use crate::{S, error::ParseError, parser::Parse};
 
@@ -30,7 +31,8 @@ mod test_util {
         match result {
             Ok(v) => assert_eq!(v, expect),
             Err(e) => {
-                panic!("parse failed: {e}")
+                let map = SourceMap::from_paths(&[][..]).unwrap();
+                panic!("parse failed: {}", e.display(&map))
             }
         }
     }
