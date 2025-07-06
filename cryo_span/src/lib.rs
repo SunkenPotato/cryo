@@ -26,7 +26,7 @@ static SOURCE_MAP: OnceLock<SourceMap> = OnceLock::new();
 /// Required for operations such as [`Span`] formatting to work.
 ///
 /// ## Examples
-/// ```rs
+/// ```rust
 /// use cryo_span::source_map::SourceMap;
 ///
 /// let source_map = SourceMap::from_paths(&[][..]).unwrap();
@@ -46,7 +46,7 @@ pub fn initialise(map: SourceMap) -> Result<&'static SourceMap, SourceMap> {
 /// A span contains the start, the stop, and the file of the section it refers to. It acts similar to a range.
 ///
 /// ## Examples
-/// ```rs
+/// ```rust
 /// Span::new(0, 20);
 /// ```
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

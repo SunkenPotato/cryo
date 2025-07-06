@@ -6,7 +6,7 @@
 //!
 //! Furthermore, each parse error type implements [`std::fmt::Display`].
 //!
-//! To declare a parse error type, view [`parse_error`].
+//! To declare a parse error type, view [`parse_error`](cryo_parser::parse_error).
 
 #![allow(private_bounds)]
 
@@ -15,10 +15,15 @@ use std::fmt::{Debug, Display};
 use cryo_lexer::stream::TokenStreamError;
 use cryo_span::Span;
 
-pub(crate) trait ParseError {
+/// An abstract representation of a parse error.
+pub trait ParseError {
+    /// The code of this parse error.
     fn code(&self) -> u32;
+    /// The name of this parse error.
     fn name(&self) -> &'static str;
+    /// The subcode of this parse error / parse error variant.
     fn subcode(&self) -> u32;
+    /// The span this parse error points has.
     fn span(&self) -> &Span;
 }
 
@@ -102,7 +107,7 @@ macro_rules! sec {
 /// Furthermore, each variant must also have the attribute of the form `#($subcode, $format_string, $format_args)` after the declaration of rust attributes.
 ///
 /// A grouping parse error is defined as a simple enum with no required attributes and tuple variants with exactly one field that the error type may be. The variant further more has the bound:
-/// ```rs
+/// ```rust
 /// Spanned<E>: ParseError
 /// ```
 /// It also must be annotated with the `#(group)` attribute.
@@ -111,7 +116,7 @@ macro_rules! sec {
 /// In a group enum however, the macro automatically specifies the variant fields to be of `Spanned<E>`, where `E` is the type that the variant was declared with inside the macro.
 ///
 /// ## Examples
-/// ```rs
+/// ```rust
 /// parse_error! {
 ///     #[repr(C)]
 ///     /// documentation...
@@ -125,7 +130,7 @@ macro_rules! sec {
 ///     }
 /// }
 /// ```
-/// ```rs
+/// ```rust
 /// parse_error! {
 ///     #[derive(Clone, PartialEq, Debug)]
 ///     #(group)
