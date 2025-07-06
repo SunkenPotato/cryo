@@ -1,3 +1,5 @@
+//! Type-level parser combinators.
+
 use cryo_lexer::stream::TokenStreamGuard;
 use cryo_span::{Span, Spanned};
 
@@ -32,6 +34,7 @@ macro_rules! sealed {
 }
 
 struct Sealer;
+#[doc(hidden)]
 pub struct Never(Sealer);
 
 impl Parse for Never {
@@ -84,10 +87,16 @@ mod either {
         fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output>;
     }
 
+    /// The "or" parser combinator.
+    ///
+    /// `A` must be a tuple of types implementing `Parse`. Due to type system restrictions, the tuple must have 1 to 12 elements. To specify more, use nested [`Either`]s.
+    ///
+    /// This type will try to parse the types in the tuple in the order that they were specified and then return that type in the form of `EitherOutput`.
     pub struct Either<A: ParseEither> {
         _p: PhantomData<A>,
     }
 
+    /// The output of a [`Either`] combinator.
     pub enum EitherOutput<
         A: Parse,
         B: Parse = Never,
@@ -102,17 +111,29 @@ mod either {
         K: Parse = Never,
         L: Parse = Never,
     > {
+        #[expect(missing_docs)]
         A(A::Output),
+        #[expect(missing_docs)]
         B(B::Output),
+        #[expect(missing_docs)]
         C(C::Output),
+        #[expect(missing_docs)]
         D(D::Output),
+        #[expect(missing_docs)]
         E(E::Output),
+        #[expect(missing_docs)]
         F(F::Output),
+        #[expect(missing_docs)]
         G(G::Output),
+        #[expect(missing_docs)]
         H(H::Output),
+        #[expect(missing_docs)]
         I(I::Output),
+        #[expect(missing_docs)]
         J(J::Output),
+        #[expect(missing_docs)]
         K(K::Output),
+        #[expect(missing_docs)]
         L(L::Output),
     }
 
@@ -149,6 +170,11 @@ mod and {
 
     variadic!(impl_parse_and);
 
+    /// The "and" parser combinator.
+    ///
+    /// `A` must be a tuple of length 1 to 12 where each element implements [`Parse`].
+    ///
+    /// This combinator will try to parse each type one after another until it is done and then return it in the form of [`AndOutput`].
     pub struct And<A: ParseAnd> {
         _p: PhantomData<A>,
     }
@@ -161,6 +187,7 @@ mod and {
         }
     }
 
+    /// The output of an [`And`] combinator.
     #[allow(unused)]
     pub struct AndOutput<
         A: Parse,
@@ -176,17 +203,29 @@ mod and {
         K: Parse = Never,
         L: Parse = Never,
     > {
+        #[expect(missing_docs)]
         pub a: A::Output,
+        #[expect(missing_docs)]
         pub b: B::Output,
+        #[expect(missing_docs)]
         pub c: C::Output,
+        #[expect(missing_docs)]
         pub d: D::Output,
+        #[expect(missing_docs)]
         pub e: E::Output,
+        #[expect(missing_docs)]
         pub f: F::Output,
+        #[expect(missing_docs)]
         pub g: G::Output,
+        #[expect(missing_docs)]
         pub h: H::Output,
+        #[expect(missing_docs)]
         pub i: I::Output,
+        #[expect(missing_docs)]
         pub j: J::Output,
+        #[expect(missing_docs)]
         pub k: K::Output,
+        #[expect(missing_docs)]
         pub l: L::Output,
     }
 }

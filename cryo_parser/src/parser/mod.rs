@@ -1,3 +1,5 @@
+//! Tools for parsing tokens.
+
 use cryo_lexer::{
     FromToken,
     stream::{TokenStream, TokenStreamGuard},
@@ -9,10 +11,16 @@ use crate::{S, error::ParseError};
 
 pub mod combinators;
 
+/// The result of a parser.
 pub type ParseResult<T> = Result<S<T>, Box<dyn ParseError>>;
 
+/// A parser.
+///
+/// For non-terminals, it is often enough to derive this trait.
 pub trait Parse: Sized {
+    /// The type that this parser returns (often `Self`).
     type Output;
+    /// The actual parser.
     fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output>;
 }
 
@@ -32,6 +40,9 @@ impl<T: Parse> Parse for Box<T> {
     }
 }
 
+/// A utility for parsing terminals which require exactly one token.
+///
+/// The closure supplied must take a type which implements [`cryo_lexer::FromToken`] and effectively return a [`ParseResult`].
 pub fn terminal<'source, T, R, E, F>(
     stream: &mut TokenStream<'source>,
     f: F,
@@ -47,6 +58,8 @@ where
     })
 }
 
+/// Wrapper around `tokens.with(T::parse)`.
+#[track_caller]
 pub fn parser<T>(mut tokens: TokenStream) -> ParseResult<T::Output>
 where
     T: Parse,

@@ -1,3 +1,13 @@
+//! Parse errors.
+//!
+//! To accomodate different error types being returned from parsers, rather than returning a concrete type, parsers return a `Result<T, Box<dyn ParseError>>`.
+//!
+//! A parse error consists of a `code` indicating the code of the error type, a `subcode` which is unique to each variant within the enum, a [`Span`] supplied by `Spanned<ErrorType>` and a name used for display operations.
+//!
+//! Furthermore, each parse error type implements [`std::fmt::Display`].
+//!
+//! To declare a parse error type, view [`parse_error`].
+
 #![allow(private_bounds)]
 
 use std::fmt::{Debug, Display};
@@ -74,6 +84,7 @@ impl<T: ParseError + 'static> From<T> for Box<dyn ParseError> {
     }
 }
 
+/// Emit only the second token passed.
 #[macro_export]
 macro_rules! sec {
     ($f:tt | $sec:tt) => {
@@ -81,6 +92,49 @@ macro_rules! sec {
     };
 }
 
+/// Define a parse error.
+///
+/// You can either define a concrete parse error type or a grouping of parse error types, where for the latter, the properties of the variant type are used in the [`ParseError`] implementation.
+///
+/// Concrete errors must have an `#(concrete, $name, $code)` attribute after rust attributes are defined.
+///
+/// Each variant must be a unit or tuple variant where for the latter, each field must be given a name so as it may be used in the [`Display`] implementation generated.
+/// Furthermore, each variant must also have the attribute of the form `#($subcode, $format_string, $format_args)` after the declaration of rust attributes.
+///
+/// A grouping parse error is defined as a simple enum with no required attributes and tuple variants with exactly one field that the error type may be. The variant further more has the bound:
+/// ```rs
+/// Spanned<E>: ParseError
+/// ```
+/// It also must be annotated with the `#(group)` attribute.
+///
+/// In both cases, [`ParseError`] is not implemented for the enum, but rather for `Spanned<T>`.
+/// In a group enum however, the macro automatically specifies the variant fields to be of `Spanned<E>`, where `E` is the type that the variant was declared with inside the macro.
+///
+/// ## Examples
+/// ```rs
+/// parse_error! {
+///     #[repr(C)]
+///     /// documentation...
+///     #[must_use]
+///     #(concrete, "my parse error type", 314)
+///     pub enum ParseErrorType {
+///         #(1, "variant a error")
+///         VariantA,
+///         #(2, "variant b with extra info: {info}")
+///         VariantB(info: String)
+///     }
+/// }
+/// ```
+/// ```rs
+/// parse_error! {
+///     #[derive(Clone, PartialEq, Debug)]
+///     #(group)
+///     pub enum Group {
+///         ConcreteA(ConcreteA),
+///         OtherGroup(OtherGroup)
+///     }
+/// }
+/// ```
 #[macro_export]
 macro_rules! parse_error {
     (
@@ -152,6 +206,7 @@ macro_rules! parse_error {
             )*
         };
 
+        $(#[$attr])*
         $visibility enum $identifier {
             $(
                 $(#[$var_attr])*

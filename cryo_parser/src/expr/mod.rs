@@ -1,3 +1,7 @@
+//! Expressions.
+//!
+//! Expressions are components of programming languages that, when evaluated, return a value.
+
 pub mod literal;
 pub mod math_expr;
 #[cfg(test)]
@@ -14,10 +18,17 @@ use crate::{
     parser::Parse,
 };
 
+/// An expression.
+///
+/// `Expr` is split up into `MathExpr` and `ReducedExpr` to ease `MathExpr` parsing.
+///
+/// For the other expression types, view [`ReducedExpr`].
 // derive(Parse) cannot be applied to this to prevent double ReducedExpr parsing
 #[derive(Debug, PartialEq)]
 pub enum Expr {
+    /// An arithmetic expression.
     MathExpr(Box<MathExpr>),
+    /// Any other expression type.
     ReducedExpr(ReducedExpr),
 }
 
@@ -48,7 +59,9 @@ impl Parse for Expr {
     }
 }
 
+/// Expressions excluding `MathExpr`.
 #[derive(Parse, Debug, PartialEq)]
 pub enum ReducedExpr {
+    /// A literal expression.
     Literal(Literal),
 }
