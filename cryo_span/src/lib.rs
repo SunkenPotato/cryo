@@ -97,17 +97,19 @@ impl Display for SpanDisplay<'_, '_> {
     // TODO: replace unwraps.
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Some(file) = self.1.get(self.0.file.into()) else {
-            write!(f, "unable to find source file with index {}", self.0.file)?;
-            return Ok(());
+            return write!(f, "unable to find source file with index {}", self.0.file);
         };
 
         let path = &file.file;
-        let ((start_line, start_col), (end_line, end_col)) = (
-            file.line_col(self.0.start).unwrap(),
-            file.line_col(self.0.stop).unwrap(),
-        );
+        let (Some((start_line, start_col)), Some((end_line, end_col))) =
+            (file.line_col(self.0.start), file.line_col(self.0.stop))
+        else {
+            return write!(f, "could not format span {:?}", self.0);
+        };
 
-        let source = file.resolve_source(self.0.start, self.0.stop).unwrap();
+        let Ok(source) = file.resolve_source(self.0.start, self.0.stop) else {
+            return write!(f, "could not resolve source of span {:?}", self.0);
+        };
 
         write!(
             f,
