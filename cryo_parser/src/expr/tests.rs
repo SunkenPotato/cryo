@@ -1,8 +1,10 @@
 use cryo_span::{Span, Spanned};
+use internment::Intern;
 
 use crate::{
     expr::{
         Expr, ReducedExpr,
+        binding_ref::BindingRef,
         literal::{IntegerLiteral, Literal, StringLiteral},
         math_expr::{MathExpr, Operator},
     },
@@ -58,5 +60,15 @@ fn parse_math_expr() {
             },
             Span::new(0, 5),
         ),
+    );
+}
+
+#[test]
+fn parse_binding_ref() {
+    let stream = stream("binding");
+
+    assert_parse::<BindingRef>(
+        stream,
+        Spanned::new(BindingRef(Intern::from("binding")), Span::new(0, 7)),
     );
 }

@@ -2,6 +2,7 @@
 //!
 //! Expressions are components of programming languages that, when evaluated, return a value.
 
+pub mod binding_ref;
 pub mod literal;
 pub mod math_expr;
 #[cfg(test)]
