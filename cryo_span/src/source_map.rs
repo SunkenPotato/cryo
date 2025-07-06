@@ -10,36 +10,15 @@ use std::{
     thread,
 };
 
+use index_vec::{IndexVec, define_index_type};
 use memchr::Memchr;
 
-use crate::source_map::monotonic_vec::MonotonicVec;
+define_index_type! {
+    /// Indices for the [`SourceMap`].
+    pub struct SourceIndex = u16;
+}
 
 const NEWLINE: u8 = b'\n';
-
-mod monotonic_vec {
-    use std::ops::Deref;
-
-    #[derive(Clone, PartialEq, Eq, Debug)]
-    pub struct MonotonicVec<T>(Vec<T>);
-
-    impl<T> MonotonicVec<T> {
-        pub const fn new() -> Self {
-            Self(Vec::new())
-        }
-
-        pub fn push(&mut self, v: T) {
-            self.0.push(v)
-        }
-    }
-
-    impl<T> Deref for MonotonicVec<T> {
-        type Target = Vec<T>;
-
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(crate) struct SourceFile {
@@ -114,7 +93,7 @@ impl SourceFile {
 /// Source maps cannot be altered once created.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SourceMap {
-    pub(crate) files: MonotonicVec<SourceFile>,
+    pub(crate) files: IndexVec<SourceIndex, SourceFile>,
 }
 
 impl SourceMap {
@@ -126,7 +105,7 @@ impl SourceMap {
             let (sender, receiver) =
                 mpsc::channel::<Box<dyn FnOnce() -> Result<(), io::Error> + Send + Sync + '_>>();
             let receiver = Arc::new(Mutex::new(receiver));
-            let files = Arc::new(Mutex::new(MonotonicVec::new()));
+            let files = Arc::new(Mutex::new(IndexVec::new()));
             let error = Arc::new(Mutex::new(None));
 
             let mut handles = vec![];
@@ -172,7 +151,7 @@ impl SourceMap {
         Ok(Self { files })
     }
 
-    pub(crate) fn get(&self, idx: usize) -> Option<&SourceFile> {
+    pub(crate) fn get(&self, idx: SourceIndex) -> Option<&SourceFile> {
         self.files.get(idx)
     }
 }

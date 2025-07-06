@@ -7,7 +7,7 @@ use std::{
     ops::{Add, AddAssign, Deref, DerefMut},
 };
 
-use crate::source_map::SourceMap;
+use crate::source_map::{SourceIndex, SourceMap};
 
 pub mod source_map;
 
@@ -33,7 +33,7 @@ pub struct Span {
     pub stop: usize,
     /// The index of the file in the global [`SourceMap`].
     // TODO: replace this with an IndexVec index.
-    pub file: u16,
+    pub file: SourceIndex,
 }
 
 impl Span {
@@ -46,13 +46,13 @@ impl Span {
     #[inline]
     #[track_caller]
     pub const fn new(start: usize, stop: usize) -> Self {
-        Self::new_file(start, stop, 0)
+        Self::new_file(start, stop, SourceIndex::from_raw_unchecked(0))
     }
 
     #[inline]
     #[track_caller]
     /// Create a new span from a start, a stop, and a file index to the [`SourceMap`].
-    pub const fn new_file(start: usize, stop: usize, file: u16) -> Self {
+    pub const fn new_file(start: usize, stop: usize, file: SourceIndex) -> Self {
         assert!(stop >= start);
         Self { start, stop, file }
     }
@@ -96,8 +96,12 @@ pub struct SpanDisplay<'span, 'map>(&'span Span, &'map SourceMap);
 impl Display for SpanDisplay<'_, '_> {
     // TODO: replace unwraps.
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Some(file) = self.1.get(self.0.file.into()) else {
-            return write!(f, "unable to find source file with index {}", self.0.file);
+        let Some(file) = self.1.get(self.0.file) else {
+            return write!(
+                f,
+                "unable to find source file with index {}",
+                self.0.file.index()
+            );
         };
 
         let path = &file.file;
