@@ -40,6 +40,20 @@ impl<T: Parse> Parse for Box<T> {
     }
 }
 
+impl<T: Parse> Parse for Option<T> {
+    type Output = Option<T::Output>;
+
+    fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
+        match tokens.with(T::parse) {
+            Ok(v) => Ok(v.map(Option::Some)),
+            Err(e) => match (e.code(), e.subcode()) {
+                (0, 0 | 1) => Ok(Spanned::new(None, *e.span())),
+                _ => Err(e),
+            },
+        }
+    }
+}
+
 /// A utility for parsing terminals which require exactly one token.
 ///
 /// The closure supplied must take a type which implements [`cryo_lexer::FromToken`] and effectively return a [`ParseResult`].

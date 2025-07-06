@@ -2,13 +2,14 @@ use cryo_span::{Span, Spanned};
 use internment::Intern;
 
 use crate::{
+    error::MetaError,
     expr::{
         Expr, ReducedExpr,
         binding_ref::BindingRef,
         literal::{IntegerLiteral, Literal, StringLiteral},
         math_expr::{MathExpr, Operator},
     },
-    test_util::{TestError, assert_parse, assert_parse_fail, stream},
+    test_util::{assert_parse, assert_parse_fail, stream},
 };
 
 #[test]
@@ -24,7 +25,7 @@ fn parse_int_lit() {
 #[test]
 fn do_not_parse_int_overflow() {
     let stream = stream("2147483648");
-    assert_parse_fail::<IntegerLiteral>(stream, TestError::new(1, 0))
+    assert_parse_fail::<IntegerLiteral>(stream, MetaError::new(1, 0))
 }
 
 #[test]

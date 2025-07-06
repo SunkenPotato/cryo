@@ -99,6 +99,38 @@ impl<T: ParseError + 'static> From<T> for Box<dyn ParseError> {
     }
 }
 
+/// An error used for comparisons.
+#[derive(PartialEq, Debug)]
+pub struct MetaError {
+    code: u32,
+    subcode: u32,
+}
+
+impl MetaError {
+    /// Create a new [`MetaError`] from a code and subcode.
+    pub const fn new(code: u32, subcode: u32) -> Self {
+        Self { code, subcode }
+    }
+}
+
+impl ParseError for MetaError {
+    fn code(&self) -> u32 {
+        self.code
+    }
+
+    fn subcode(&self) -> u32 {
+        self.subcode
+    }
+
+    fn name(&self) -> &'static str {
+        unreachable!()
+    }
+
+    fn span(&self) -> &cryo_span::Span {
+        unreachable!()
+    }
+}
+
 /// Emit only the second token passed.
 #[macro_export]
 macro_rules! sec {

@@ -1,13 +1,15 @@
-use cryo_span::Span;
+use cryo_span::{Span, Spanned};
+use internment::Intern;
 
 use crate::{
-    atoms::Semi,
+    atoms::{Assign, Let, Mut, Semi},
     expr::{
         Expr, ReducedExpr,
+        binding_ref::BindingRef,
         literal::{IntegerLiteral, Literal},
         math_expr::MathExpr,
     },
-    stmt::{ExprStmt, Stmt},
+    stmt::{ExprStmt, Stmt, binding::Binding},
     test_util::{assert_parse, stream},
 };
 
@@ -17,7 +19,7 @@ fn parse_expr_stmt() {
 
     assert_parse::<Stmt>(
         input,
-        cryo_span::Spanned::new(
+        Spanned::new(
             Stmt::ExprStmt(ExprStmt {
                 expr: Expr::MathExpr(Box::new(MathExpr {
                     lhs: ReducedExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(5))),
@@ -31,4 +33,48 @@ fn parse_expr_stmt() {
             Span::new(0, 6),
         ),
     );
+}
+
+#[test]
+fn parse_immutable_binding() {
+    let input = stream("let x = 5;");
+
+    assert_parse::<Binding>(
+        input,
+        Spanned::new(
+            Binding {
+                let_kw: Let,
+                mut_kw: None,
+                binding_name: BindingRef(Intern::from("x")),
+                assign: Assign,
+                rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
+                    IntegerLiteral(5),
+                ))),
+                semi: Semi,
+            },
+            Span::new(0, 10),
+        ),
+    )
+}
+
+#[test]
+fn parse_mutable_binding() {
+    let input = stream("let mut x = 7;");
+
+    assert_parse::<Binding>(
+        input,
+        Spanned::new(
+            Binding {
+                let_kw: Let,
+                mut_kw: Some(Mut),
+                binding_name: BindingRef(Intern::from("x")),
+                assign: Assign,
+                rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
+                    IntegerLiteral(7),
+                ))),
+                semi: Semi,
+            },
+            Span::new(0, 14),
+        ),
+    )
 }
