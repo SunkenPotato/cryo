@@ -15,6 +15,8 @@ pub enum Literal<'source> {
     StringLiteral(StringLiteral<'source>),
     /// An integer literal.
     IntegerLiteral(IntegerLiteral<'source>),
+    /// A boolean literal.
+    BooleanLiteral(BooleanLiteral),
 }
 
 token_marker!(Literal<'source>);
@@ -152,13 +154,50 @@ impl Lex for IntegerLiteral<'_> {
     }
 }
 
+/// A boolean literal. Can be either `True` or `False`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BooleanLiteral {
+    /// The `true` variant.
+    True,
+    /// The `false` variant.
+    False,
+}
+
+impl Lex for BooleanLiteral {
+    fn lex(s: &str) -> Result<(Token, &str), Error> {
+        let (token, rest) = find_token_end(s);
+        if token == "true" {
+            Ok((
+                Token::new(
+                    TokenType::Literal(Literal::BooleanLiteral(BooleanLiteral::True)),
+                    Span::new(0, 4),
+                ),
+                rest,
+            ))
+        } else if token == "false" {
+            Ok((
+                Token::new(
+                    TokenType::Literal(Literal::BooleanLiteral(BooleanLiteral::False)),
+                    Span::new(0, 5),
+                ),
+                rest,
+            ))
+        } else {
+            Err(Error::new(
+                LexicalError::SequenceNotFound("true | false"),
+                Span::new(0, token.len()),
+            ))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use cryo_span::Span;
 
     use crate::{
         Error, Lex, Token, TokenType,
-        literal::{IntegerLiteral, Literal, StringLiteral},
+        literal::{BooleanLiteral, IntegerLiteral, Literal, StringLiteral},
     };
 
     #[test]
@@ -270,6 +309,31 @@ mod tests {
             Err(Error::new(
                 crate::LexicalError::InvalidSequence,
                 Span::new(0, 4)
+            ))
+        )
+    }
+
+    #[test]
+    fn parse_bool_lit() {
+        assert_eq!(
+            BooleanLiteral::lex("true"),
+            Ok((
+                Token::new(
+                    TokenType::Literal(Literal::BooleanLiteral(BooleanLiteral::True)),
+                    Span::new(0, 4)
+                ),
+                ""
+            ))
+        );
+
+        assert_eq!(
+            BooleanLiteral::lex("false"),
+            Ok((
+                Token::new(
+                    TokenType::Literal(Literal::BooleanLiteral(BooleanLiteral::False)),
+                    Span::new(0, 5)
+                ),
+                ""
             ))
         )
     }

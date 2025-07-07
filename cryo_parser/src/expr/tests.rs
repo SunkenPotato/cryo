@@ -6,11 +6,11 @@ use crate::{
     error::MetaError,
     expr::{
         Expr, ReducedExpr,
+        binary_expr::{MathExpr, Operator},
         binding_ref::BindingRef,
         block::Block,
         cond_expr::{ElseIfBlock, IfBlock, IfExpr},
         literal::{IntegerLiteral, Literal, StringLiteral},
-        math_expr::{MathExpr, Operator},
     },
     stmt::{Stmt, binding::Binding},
     test_util::{assert_parse, assert_parse_fail, stream},
@@ -58,7 +58,7 @@ fn parse_math_expr() {
         Spanned::new(
             MathExpr {
                 lhs: ReducedExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(5))),
-                op: super::math_expr::Operator::Add,
+                op: super::binary_expr::Operator::Add,
                 rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
                     IntegerLiteral(4),
                 ))),

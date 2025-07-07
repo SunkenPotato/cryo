@@ -34,7 +34,7 @@ use std::fmt::Display;
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    atoms::{Assign, Keyword, LCurly, Operator, RCurly, Semi},
+    atoms::{Assign, Keyword, LCurly, Operators, RCurly, Semi},
     identifier::Identifier,
     literal::Literal,
     stream::TokenStream,
@@ -100,6 +100,7 @@ macro_rules! atom {
         }
     };
 
+
     (
         $(#[$attr:meta])*
         $visibility:vis enum $identifier:ident {
@@ -108,7 +109,7 @@ macro_rules! atom {
                 #($atom:expr)
                 $variant:ident
             ),*
-        }
+        } with $constructor:path
     ) => {
         $(#[$attr])*
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -140,7 +141,7 @@ macro_rules! atom {
                 for variant in Self::VARIANTS {
                     let atom = variant.as_str();
                     if let Some(v) = s.strip_prefix(variant.as_str()) {
-                        return Ok(($crate::Token::new($crate::TokenType::$identifier(*variant), cryo_span::Span::new(0, atom.len())), v))
+                        return Ok(($crate::Token::new($constructor(*variant), cryo_span::Span::new(0, atom.len())), v))
                     }
                 }
 
@@ -164,7 +165,7 @@ macro_rules! atom {
                             super::$identifier::lex(super::$identifier::$variant.as_str()),
                             Ok((
                                 $crate::Token::new(
-                                    $crate::TokenType::$identifier(
+                                    $constructor(
                                         super::$identifier::$variant
                                     ),
                                     cryo_span::Span::new(0, super::$identifier::$variant.as_str().len())
@@ -176,7 +177,29 @@ macro_rules! atom {
                 )*
             }
         }
-    }
+    };
+
+    (
+        $(#[$attr:meta])*
+        $visibility:vis enum $identifier:ident {
+            $(
+                $(#[$variant_attr:meta])*
+                #($atom:expr)
+                $variant:ident
+            ),*
+        }
+    ) => {
+        $crate::atom!(
+            $(#[$attr])*
+            $visibility enum $identifier {
+                $(
+                    $(#[$variant_attr])*
+                    #($atom)
+                    $variant
+                ),*
+            } with $crate::TokenType::$identifier
+        );
+    };
 }
 
 /// Split an input string while the supplied function returns `false`.
@@ -219,7 +242,7 @@ pub enum TokenType<'source> {
     /// A literal.
     Literal(Literal<'source>),
     /// An arithmetic operator.
-    Operator(Operator),
+    Operators(Operators),
     /// An assign token (`=`).
     Assign(Assign),
     /// A semicolon (`;`).
@@ -247,7 +270,7 @@ impl<'s> TokenType<'s> {
         Keyword::lex,
         Identifier::lex,
         Literal::lex,
-        Operator::lex,
+        Operators::lex,
         Assign::lex,
         Semi::lex,
         RCurly::lex,
@@ -326,7 +349,7 @@ mod tests {
 
     use crate::{
         Token, TokenType,
-        atoms::{Assign, Keyword, Operator, Semi},
+        atoms::{Assign, Keyword, Operators, Semi},
         identifier::Identifier,
         lexer,
         literal::{IntegerLiteral, Literal, StringLiteral},
@@ -344,7 +367,7 @@ mod tests {
                 TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral("20"))),
                 Span::new(12, 14),
             ),
-            Token::new(TokenType::Operator(Operator::Add), Span::new(15, 16)),
+            Token::new(TokenType::Operators(Operators::Add), Span::new(15, 16)),
             Token::new(
                 TokenType::Literal(Literal::StringLiteral(StringLiteral("hello"))),
                 Span::new(17, 24),

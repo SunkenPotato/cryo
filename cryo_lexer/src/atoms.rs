@@ -45,8 +45,8 @@ atom! {
 }
 
 atom! {
-    /// Arithmetic operators.
-    pub enum Operator {
+    /// Operators for binary expressions.
+    pub enum Operators {
         /// The addition operator (`+`).
         #("+")
         Add,
@@ -61,6 +61,12 @@ atom! {
         Div,
         /// The remainder operator (`%`).
         #("%")
-        Rem
+        Rem,
+        /// The equality operator (`==`).
+        #("==")
+        Eq,
+        /// The inequality operator (`!=`).
+        #("!=")
+        NotEq
     }
 }

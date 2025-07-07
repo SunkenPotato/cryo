@@ -5,9 +5,9 @@ use crate::{
     atoms::{Assign, Let, Mut, Semi},
     expr::{
         Expr, ReducedExpr,
+        binary_expr::MathExpr,
         binding_ref::BindingRef,
         literal::{IntegerLiteral, Literal},
-        math_expr::MathExpr,
     },
     stmt::{ExprStmt, Stmt, binding::Binding},
     test_util::{assert_parse, stream},
@@ -23,7 +23,7 @@ fn parse_expr_stmt() {
             Stmt::ExprStmt(ExprStmt {
                 expr: Expr::MathExpr(Box::new(MathExpr {
                     lhs: ReducedExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(5))),
-                    op: crate::expr::math_expr::Operator::Add,
+                    op: crate::expr::binary_expr::Operator::Add,
                     rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
                         IntegerLiteral(5),
                     ))),

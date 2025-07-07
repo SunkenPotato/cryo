@@ -4,10 +4,10 @@ use crate::{
     expr::{Expr, ReducedExpr},
     parser::Parse,
 };
-use cryo_lexer::atoms::Operator as OToken;
+use cryo_lexer::atoms::Operators as OToken;
 use cryo_parser_proc_macro::Parse;
 
-/// An arithmetic expression.
+/// A binary expression.
 ///
 /// This consists of a left-hand [`ReducedExpr`], an [`Operator`], and a right-hand side [`Expr`].
 #[derive(Parse, Debug, PartialEq)]
@@ -20,7 +20,7 @@ pub struct MathExpr {
     pub rhs: Expr,
 }
 
-/// An arithmetic operator.
+/// Operators used for binary expressions.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Operator {
     /// The addition operator (`+`).
@@ -33,6 +33,10 @@ pub enum Operator {
     Div,
     /// The remainder operator (`%`).
     Rem,
+    /// The equality operator (`==`).
+    Eq,
+    /// The inequality operator (`!=`).
+    NotEq,
 }
 
 impl Parse for Operator {
@@ -48,6 +52,8 @@ impl Parse for Operator {
             OToken::Mul => Self::Mul,
             OToken::Div => Self::Div,
             OToken::Rem => Self::Rem,
+            OToken::Eq => Self::Eq,
+            OToken::NotEq => Self::NotEq,
         }))
     }
 }

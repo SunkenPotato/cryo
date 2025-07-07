@@ -2,11 +2,11 @@
 //!
 //! Expressions are components of programming languages that, when evaluated, return a value.
 
+pub mod binary_expr;
 pub mod binding_ref;
 pub mod block;
 pub mod cond_expr;
 pub mod literal;
-pub mod math_expr;
 
 #[cfg(test)]
 mod tests;
@@ -16,11 +16,11 @@ use cryo_span::Spanned;
 
 use crate::{
     expr::{
+        binary_expr::{MathExpr, Operator},
         binding_ref::BindingRef,
         block::Block,
         cond_expr::IfExpr,
         literal::Literal,
-        math_expr::{MathExpr, Operator},
     },
     parser::Parse,
 };
