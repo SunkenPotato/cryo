@@ -31,6 +31,7 @@ pub mod stream;
 
 use std::fmt::Display;
 
+use atoms::Visibility;
 use cryo_span::{Span, Spanned};
 
 use crate::{
@@ -251,6 +252,8 @@ pub enum TokenType<'source> {
     RCurly(RCurly),
     /// The left curly brace ('}')
     LCurly(LCurly),
+    /// The visibility token.
+    Visibility(Visibility),
 }
 
 trait Sealed {}

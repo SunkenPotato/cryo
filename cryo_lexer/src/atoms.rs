@@ -2,7 +2,9 @@
 //!
 //! Atoms are tokens which are constant and only may be parsed from one specific input.
 
-use crate::atom;
+use cryo_span::Span;
+
+use crate::{Lex, LexicalError, Token, TokenType, atom, find_token_end};
 
 /// A semicolon token (`;`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -40,7 +42,10 @@ atom! {
         If,
         /// The `else` keyword. Used to define the operation to be executed should an if-statement not be valid.
         #("else")
-        Else
+        Else,
+        /// The `struct` keyword. Used to define structs.
+        #("struct")
+        Struct
     }
 }
 
@@ -70,3 +75,49 @@ atom! {
         NotEq
     }
 }
+
+/// Item visibility token.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Visibility {
+    /// Private visibility.
+    Private,
+    /// Public visibility.
+    Public,
+}
+
+impl Lex for Visibility {
+    fn lex(s: &str) -> Result<(crate::Token, &str), crate::Error> {
+        let (token, rest) = find_token_end(s);
+
+        if let Ok((
+            Token {
+                t: TokenType::Keyword(Keyword::Struct),
+                ..
+            },
+            ..,
+        )) = Keyword::lex(rest)
+        {
+            return match token {
+                "" => Ok((
+                    Token::new(TokenType::Visibility(Visibility::Private), Span::new(0, 0)),
+                    rest,
+                )),
+                "pub" => Ok((
+                    Token::new(TokenType::Visibility(Visibility::Public), Span::new(0, 3)),
+                    rest,
+                )),
+                _ => Err(crate::Error::new(
+                    LexicalError::SequenceNotFound("pub | \"\""),
+                    Span::new(0, token.len()),
+                )),
+            };
+        }
+
+        return Err(crate::Error::new(
+            LexicalError::SequenceNotFound("item keyword"),
+            Span::new(0, token.len()),
+        ));
+    }
+}
+
+token_marker!(Visibility);
