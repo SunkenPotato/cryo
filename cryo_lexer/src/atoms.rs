@@ -34,7 +34,13 @@ atom! {
         Let,
         /// The `mut` keyword. Used to declare mutability on bindings.
         #("mut")
-        Mut
+        Mut,
+        /// The `if` keyword. Used to indicate a conditional block.
+        #("if")
+        If,
+        /// The `else` keyword. Used to define the operation to be executed should an if-statement not be valid.
+        #("else")
+        Else
     }
 }
 

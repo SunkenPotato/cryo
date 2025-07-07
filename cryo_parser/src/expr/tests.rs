@@ -2,12 +2,13 @@ use cryo_span::{Span, Spanned};
 use internment::Intern;
 
 use crate::{
-    atoms::{Assign, LCurly, Let, RCurly, Semi},
+    atoms::{Assign, Else, If, LCurly, Let, RCurly, Semi},
     error::MetaError,
     expr::{
         Expr, ReducedExpr,
         binding_ref::BindingRef,
         block::Block,
+        cond_expr::{ElseIfBlock, IfBlock, IfExpr},
         literal::{IntegerLiteral, Literal, StringLiteral},
         math_expr::{MathExpr, Operator},
     },
@@ -167,6 +168,220 @@ fn parse_empty_block_expr() {
                 r_curly: RCurly,
             },
             Span::new(0, 2),
+        ),
+    );
+}
+
+#[test]
+fn parse_if_block() {
+    let stream = stream("if 5 { 7 }");
+
+    assert_parse::<IfExpr>(
+        stream,
+        Spanned::new(
+            IfExpr {
+                if_block: IfBlock {
+                    if_kw: If,
+                    condition: Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                        Literal::IntegerLiteral(IntegerLiteral(5)),
+                    ))),
+                    if_block: Block {
+                        l_curly: LCurly,
+                        stmts: vec![],
+                        tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                            Literal::IntegerLiteral(IntegerLiteral(7)),
+                        )))),
+                        r_curly: RCurly,
+                    },
+                },
+                else_if_blocks: vec![],
+                else_block: None,
+            },
+            Span::new(0, 10),
+        ),
+    )
+}
+
+#[test]
+fn parse_if_with_else_if() {
+    let stream = stream("if 5 { 7 } else if 9 { 8 }");
+
+    assert_parse::<IfExpr>(
+        stream,
+        Spanned::new(
+            IfExpr {
+                if_block: IfBlock {
+                    if_kw: If,
+                    condition: Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                        Literal::IntegerLiteral(IntegerLiteral(5)),
+                    ))),
+                    if_block: Block {
+                        l_curly: LCurly,
+                        stmts: vec![],
+                        tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                            Literal::IntegerLiteral(IntegerLiteral(7)),
+                        )))),
+                        r_curly: RCurly,
+                    },
+                },
+                else_if_blocks: vec![ElseIfBlock {
+                    else_kw: Else,
+                    if_block: IfBlock {
+                        if_kw: If,
+                        condition: Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                            Literal::IntegerLiteral(IntegerLiteral(9)),
+                        ))),
+                        if_block: Block {
+                            l_curly: LCurly,
+                            stmts: vec![],
+                            tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                                Literal::IntegerLiteral(IntegerLiteral(8)),
+                            )))),
+                            r_curly: RCurly,
+                        },
+                    },
+                }],
+                else_block: None,
+            },
+            Span::new(0, 26),
+        ),
+    );
+}
+
+#[test]
+fn parse_if_with_else_block() {
+    let stream = stream("if 5 { 7 } else { 2 }");
+
+    assert_parse::<IfExpr>(
+        stream,
+        Spanned::new(
+            IfExpr {
+                if_block: IfBlock {
+                    if_kw: If,
+                    condition: Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                        Literal::IntegerLiteral(IntegerLiteral(5)),
+                    ))),
+                    if_block: Block {
+                        l_curly: LCurly,
+                        stmts: vec![],
+                        tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                            Literal::IntegerLiteral(IntegerLiteral(7)),
+                        )))),
+                        r_curly: RCurly,
+                    },
+                },
+                else_if_blocks: vec![],
+                else_block: Some(crate::expr::cond_expr::ElseBlock {
+                    else_kw: Else,
+                    block: Block {
+                        l_curly: LCurly,
+                        stmts: vec![],
+                        tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                            Literal::IntegerLiteral(IntegerLiteral(2)),
+                        )))),
+                        r_curly: RCurly,
+                    },
+                }),
+            },
+            Span::new(0, 21),
+        ),
+    );
+}
+
+#[test]
+fn parse_if_with_else_if_and_else_block() {
+    let stream =
+        stream("if 1 { 2 } else if 3 { let x = 4; x } else if 5 { let y = 6; y + 0 } else { 7 }");
+
+    assert_parse::<IfExpr>(
+        stream,
+        Spanned::new(
+            IfExpr {
+                if_block: IfBlock {
+                    if_kw: If,
+                    condition: Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                        Literal::IntegerLiteral(IntegerLiteral(1)),
+                    ))),
+                    if_block: Block {
+                        l_curly: LCurly,
+                        stmts: vec![],
+                        tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                            Literal::IntegerLiteral(IntegerLiteral(2)),
+                        )))),
+                        r_curly: RCurly,
+                    },
+                },
+                else_if_blocks: vec![
+                    ElseIfBlock {
+                        else_kw: Else,
+                        if_block: IfBlock {
+                            if_kw: If,
+                            condition: Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                                Literal::IntegerLiteral(IntegerLiteral(3)),
+                            ))),
+                            if_block: Block {
+                                l_curly: LCurly,
+                                stmts: vec![Stmt::Binding(Binding {
+                                    let_kw: Let,
+                                    mut_kw: None,
+                                    ident: BindingRef(Intern::from("x")),
+                                    assign: Assign,
+                                    rhs: Expr::ReducedExpr(ReducedExpr::Literal(
+                                        Literal::IntegerLiteral(IntegerLiteral(4)),
+                                    )),
+                                    semi: Semi,
+                                })],
+                                tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::BindingRef(
+                                    BindingRef(Intern::from("x")),
+                                )))),
+                                r_curly: RCurly,
+                            },
+                        },
+                    },
+                    ElseIfBlock {
+                        else_kw: Else,
+                        if_block: IfBlock {
+                            if_kw: If,
+                            condition: Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                                Literal::IntegerLiteral(IntegerLiteral(5)),
+                            ))),
+                            if_block: Block {
+                                l_curly: LCurly,
+                                stmts: vec![Stmt::Binding(Binding {
+                                    let_kw: Let,
+                                    mut_kw: None,
+                                    ident: BindingRef(Intern::from("y")),
+                                    assign: Assign,
+                                    rhs: Expr::ReducedExpr(ReducedExpr::Literal(
+                                        Literal::IntegerLiteral(IntegerLiteral(6)),
+                                    )),
+                                    semi: Semi,
+                                })],
+                                tail: Some(Box::new(Expr::MathExpr(Box::new(MathExpr {
+                                    lhs: ReducedExpr::BindingRef(BindingRef(Intern::from("y"))),
+                                    op: Operator::Add,
+                                    rhs: Expr::ReducedExpr(ReducedExpr::Literal(
+                                        Literal::IntegerLiteral(IntegerLiteral(0)),
+                                    )),
+                                })))),
+                                r_curly: RCurly,
+                            },
+                        },
+                    },
+                ],
+                else_block: Some(crate::expr::cond_expr::ElseBlock {
+                    else_kw: Else,
+                    block: Block {
+                        l_curly: LCurly,
+                        stmts: vec![],
+                        tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                            Literal::IntegerLiteral(IntegerLiteral(7)),
+                        )))),
+                        r_curly: RCurly,
+                    },
+                }),
+            },
+            Span::new(0, 79),
         ),
     );
 }

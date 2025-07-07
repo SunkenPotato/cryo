@@ -60,28 +60,25 @@ impl<T: Parse> Parse for Vec<T> {
     fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
         let mut vec = vec![];
         let mut span = Span::ZERO;
-        let mut first_item = true;
 
-        // Get the current position for empty vectors
-        let current_pos = if let Ok(token) = tokens.peek() {
-            Span::new(token.span.start, token.span.start)
-        } else {
-            Span::ZERO
+        let current_span = match tokens.peek() {
+            Ok(Spanned {
+                span: current_span, ..
+            }) => *current_span,
+            _ => return Ok(Spanned::new(vec, span)),
         };
 
         while let Ok(v) = tokens.with(T::parse) {
             vec.push(v.t);
-            if first_item {
+            if vec.len() == 1 {
                 span = v.span;
-                first_item = false;
             } else {
-                span += v.span;
+                span += v.span
             }
         }
 
-        // If no items were parsed, use the current position
         if vec.is_empty() {
-            span = current_pos;
+            span = current_span;
         }
 
         Ok(Spanned::new(vec, span))

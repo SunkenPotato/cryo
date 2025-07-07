@@ -88,8 +88,9 @@ impl<T, const N: usize> From<[Spanned<T>; N]> for Spanned<[T; N]> {
 impl Add for Span {
     type Output = Self;
     fn add(mut self, rhs: Self) -> Self::Output {
-        debug_assert!(self.stop <= rhs.stop);
-        self.stop = rhs.stop;
+        if rhs.stop >= self.stop {
+            self.stop = rhs.stop;
+        }
         self
     }
 }

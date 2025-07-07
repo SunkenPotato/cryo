@@ -87,3 +87,13 @@ atom!(
     /// The `mut` keyword.
     Mut, Keyword::Mut
 );
+
+atom!(
+    /// The `if` keyword.
+    If, Keyword::If
+);
+
+atom!(
+    /// The `else` keyword.
+    Else, Keyword::Else
+);

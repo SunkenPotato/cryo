@@ -4,6 +4,7 @@
 
 pub mod binding_ref;
 pub mod block;
+pub mod cond_expr;
 pub mod literal;
 pub mod math_expr;
 
@@ -17,6 +18,7 @@ use crate::{
     expr::{
         binding_ref::BindingRef,
         block::Block,
+        cond_expr::IfExpr,
         literal::Literal,
         math_expr::{MathExpr, Operator},
     },
@@ -73,4 +75,6 @@ pub enum ReducedExpr {
     BindingRef(BindingRef),
     /// A block expression.
     Block(Block),
+    /// A conditional expression.
+    IfExpr(IfExpr),
 }
