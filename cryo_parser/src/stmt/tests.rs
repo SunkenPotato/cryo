@@ -45,7 +45,7 @@ fn parse_immutable_binding() {
             Binding {
                 let_kw: Let,
                 mut_kw: None,
-                binding_name: BindingRef(Intern::from("x")),
+                ident: BindingRef(Intern::from("x")),
                 assign: Assign,
                 rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
                     IntegerLiteral(5),
@@ -67,7 +67,7 @@ fn parse_mutable_binding() {
             Binding {
                 let_kw: Let,
                 mut_kw: Some(Mut),
-                binding_name: BindingRef(Intern::from("x")),
+                ident: BindingRef(Intern::from("x")),
                 assign: Assign,
                 rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
                     IntegerLiteral(7),

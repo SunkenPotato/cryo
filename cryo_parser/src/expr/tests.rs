@@ -2,13 +2,16 @@ use cryo_span::{Span, Spanned};
 use internment::Intern;
 
 use crate::{
+    atoms::{Assign, LCurly, Let, RCurly, Semi},
     error::MetaError,
     expr::{
         Expr, ReducedExpr,
         binding_ref::BindingRef,
+        block::Block,
         literal::{IntegerLiteral, Literal, StringLiteral},
         math_expr::{MathExpr, Operator},
     },
+    stmt::{Stmt, binding::Binding},
     test_util::{assert_parse, assert_parse_fail, stream},
 };
 
@@ -71,5 +74,99 @@ fn parse_binding_ref() {
     assert_parse::<BindingRef>(
         stream,
         Spanned::new(BindingRef(Intern::from("binding")), Span::new(0, 7)),
+    );
+}
+
+#[test]
+fn parse_block_expr_only_tail_expr() {
+    let stream = stream("{ 5 }");
+
+    assert_parse::<Block>(
+        stream,
+        Spanned::new(
+            Block {
+                l_curly: LCurly,
+                stmts: vec![],
+                tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                    Literal::IntegerLiteral(IntegerLiteral(5)),
+                )))),
+                r_curly: RCurly,
+            },
+            Span::new(0, 5),
+        ),
+    );
+}
+
+#[test]
+fn parse_block_expr_only_stmts() {
+    let stream = stream("{ let x = 5; }");
+
+    assert_parse::<Block>(
+        stream,
+        Spanned::new(
+            Block {
+                l_curly: LCurly,
+                stmts: vec![Stmt::Binding(Binding {
+                    let_kw: Let,
+                    mut_kw: None,
+                    ident: BindingRef(Intern::from("x")),
+                    assign: Assign,
+                    rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
+                        IntegerLiteral(5),
+                    ))),
+                    semi: Semi,
+                })],
+                tail: None,
+                r_curly: RCurly,
+            },
+            Span::new(0, 14),
+        ),
+    )
+}
+
+#[test]
+fn parse_block_expr_stmts_tail_expr() {
+    let tokens = stream("{ let x = 5; x }");
+
+    assert_parse::<Block>(
+        tokens,
+        Spanned::new(
+            Block {
+                l_curly: LCurly,
+                stmts: vec![Stmt::Binding(Binding {
+                    let_kw: Let,
+                    mut_kw: None,
+                    ident: BindingRef(Intern::from("x")),
+                    assign: Assign,
+                    rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
+                        IntegerLiteral(5),
+                    ))),
+                    semi: Semi,
+                })],
+                tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::BindingRef(
+                    BindingRef(Intern::from("x")),
+                )))),
+                r_curly: RCurly,
+            },
+            Span::new(0, 16),
+        ),
+    );
+}
+
+#[test]
+fn parse_empty_block_expr() {
+    let stream = stream("{}");
+
+    assert_parse::<Block>(
+        stream,
+        Spanned::new(
+            Block {
+                l_curly: LCurly,
+                stmts: vec![],
+                tail: None,
+                r_curly: RCurly,
+            },
+            Span::new(0, 2),
+        ),
     );
 }

@@ -4,86 +4,86 @@
 
 use crate::parser::Parse;
 use cryo_lexer::{
-    atoms::{Assign as AToken, Keyword, Semi as SToken},
+    atoms::{Assign as AToken, Keyword, LCurly as LCToken, RCurly as RCToken, Semi as SToken},
     stream::TokenStreamError,
 };
 use cryo_span::Spanned;
 
-/// A semicolon.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Semi;
+macro_rules! atom {
+    ($(#[doc = $doc:literal])* $out:ident, $token:ident) => {
+        $(#[doc = $doc])*
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        pub struct $out;
 
-impl Parse for Semi {
-    type Output = Self;
+        impl Parse for $out {
+            type Output = Self;
 
-    fn parse(
-        tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-    ) -> crate::parser::ParseResult<Self::Output> {
-        tokens
-            .advance_require::<SToken>()
-            .map(|v| v.map(|_| Self))
-            .map_err(Into::into)
-    }
-}
-
-/// `=`.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Assign;
-
-impl Parse for Assign {
-    type Output = Self;
-
-    fn parse(
-        tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-    ) -> crate::parser::ParseResult<Self::Output> {
-        tokens
-            .advance_require::<AToken>()
-            .map(|v| v.map(|_| Self))
-            .map_err(Into::into)
-    }
-}
-
-/// The `let` keyword.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Let;
-
-impl Parse for Let {
-    type Output = Self;
-
-    fn parse(
-        tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-    ) -> crate::parser::ParseResult<Self::Output> {
-        match tokens.advance_require::<Keyword>() {
-            Ok(Spanned {
-                t: Keyword::Let,
-                span,
-            }) => Ok(Spanned::new(Self, span)),
-            Ok(Spanned { span, .. }) => {
-                Err(Box::new(TokenStreamError::IncorrectToken("let", span)))
+            fn parse(
+                tokens: &mut cryo_lexer::stream::TokenStreamGuard,
+            ) -> crate::parser::ParseResult<Self::Output> {
+                tokens
+                    .advance_require::<$token>()
+                    .map(|v| v.map(|_| Self))
+                    .map_err(Into::into)
             }
-            Err(e) => Err(Box::new(e)),
         }
-    }
-}
+    };
 
-/// The `mut` keyword.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Mut;
-impl Parse for Mut {
-    type Output = Self;
+    ($(#[doc = $doc:literal])* $out:ident, $token:ident::$variant:ident) => {
+        $(#[doc = $doc])*
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        pub struct $out;
 
-    fn parse(
-        tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-    ) -> crate::parser::ParseResult<Self::Output> {
-        match tokens.advance_require::<Keyword>() {
-            Ok(Spanned {
-                t: Keyword::Mut,
-                span,
-            }) => Ok(Spanned::new(Self, span)),
-            Ok(Spanned { span, .. }) => {
-                Err(Box::new(TokenStreamError::IncorrectToken("mut", span)))
+        impl Parse for $out {
+            type Output = Self;
+
+            fn parse(
+                tokens: &mut cryo_lexer::stream::TokenStreamGuard,
+            ) -> crate::parser::ParseResult<Self::Output> {
+                match tokens.advance_require::<$token>() {
+                    Ok(
+                        s @ Spanned {
+                            t: $token::$variant,
+                            ..
+                        },
+                    ) => Ok(s.map(|_| Self)),
+                    Ok(Spanned { span, .. }) => Err(Box::new(TokenStreamError::IncorrectToken(
+                        stringify!($token::$variant),
+                        span,
+                    ))),
+                    Err(e) => Err(Box::new(e)),
+                }
             }
-            Err(e) => Err(Box::new(e)),
         }
-    }
+    };
 }
+
+atom!(
+    /// A semicolon (`;`).
+    Semi, SToken
+);
+
+atom!(
+    /// `=`.
+    Assign, AToken
+);
+
+atom!(
+    /// A left curly brace (`{`).
+    LCurly, LCToken
+);
+
+atom!(
+    /// A right curly brace (`}`).
+    RCurly, RCToken
+);
+
+atom!(
+    /// The `let` keyword.
+    Let, Keyword::Let
+);
+
+atom!(
+    /// The `mut` keyword.
+    Mut, Keyword::Mut
+);

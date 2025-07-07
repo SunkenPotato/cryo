@@ -69,7 +69,6 @@ fn impl_parse_and_inner(tokens: TokenStream) -> TokenStream {
             fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
                 let mut span = Span::ZERO;
                 #(
-
                     let Spanned { t: #iter4, span: #span_idents } = tokens.with(#iter5::parse)?;
                     span += #span_idents;
                 )*

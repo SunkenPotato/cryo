@@ -76,6 +76,15 @@ impl Span {
     }
 }
 
+impl<T, const N: usize> From<[Spanned<T>; N]> for Spanned<[T; N]> {
+    fn from(value: [Spanned<T>; N]) -> Self {
+        let span = value.iter().fold(Span::ZERO, |a, b| a + b.span);
+        let items = value.map(|s| s.t);
+
+        Spanned { t: items, span }
+    }
+}
+
 impl Add for Span {
     type Output = Self;
     fn add(mut self, rhs: Self) -> Self::Output {

@@ -36,7 +36,7 @@ impl<T: Parse> Parse for Box<T> {
     type Output = Box<T::Output>;
 
     fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
-        T::parse(tokens).map(|v| v.map(Box::new))
+        tokens.with(T::parse).map(|v| v.map(Box::new))
     }
 }
 
@@ -51,6 +51,48 @@ impl<T: Parse> Parse for Option<T> {
                 _ => Err(e),
             },
         }
+    }
+}
+
+impl<T: Parse> Parse for Vec<T> {
+    type Output = Vec<T::Output>;
+
+    fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
+        let mut vec = vec![];
+        let mut span = Span::ZERO;
+        let mut first_item = true;
+
+        // Get the current position for empty vectors
+        let current_pos = if let Ok(token) = tokens.peek() {
+            Span::new(token.span.start, token.span.start)
+        } else {
+            Span::ZERO
+        };
+
+        while let Ok(v) = tokens.with(T::parse) {
+            vec.push(v.t);
+            if first_item {
+                span = v.span;
+                first_item = false;
+            } else {
+                span += v.span;
+            }
+        }
+
+        // If no items were parsed, use the current position
+        if vec.is_empty() {
+            span = current_pos;
+        }
+
+        Ok(Spanned::new(vec, span))
+    }
+}
+
+impl<T: Parse, const N: usize> Parse for [T; N] {
+    type Output = [T::Output; N];
+
+    fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
+        core::array::try_from_fn(|_| tokens.with(T::parse)).map(Into::into)
     }
 }
 

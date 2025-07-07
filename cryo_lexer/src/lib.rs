@@ -34,7 +34,7 @@ use std::fmt::Display;
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    atoms::{Assign, Keyword, Operator, Semi},
+    atoms::{Assign, Keyword, LCurly, Operator, RCurly, Semi},
     identifier::Identifier,
     literal::Literal,
     stream::TokenStream,
@@ -224,6 +224,10 @@ pub enum TokenType<'source> {
     Assign(Assign),
     /// A semicolon (`;`).
     Semi(Semi),
+    /// The right curly brace ('{').
+    RCurly(RCurly),
+    /// The left curly brace ('}')
+    LCurly(LCurly),
 }
 
 trait Sealed {}
@@ -246,6 +250,8 @@ impl<'s> TokenType<'s> {
         Operator::lex,
         Assign::lex,
         Semi::lex,
+        RCurly::lex,
+        LCurly::lex,
     ];
 }
 

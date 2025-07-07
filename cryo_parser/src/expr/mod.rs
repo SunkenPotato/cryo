@@ -3,8 +3,10 @@
 //! Expressions are components of programming languages that, when evaluated, return a value.
 
 pub mod binding_ref;
+pub mod block;
 pub mod literal;
 pub mod math_expr;
+
 #[cfg(test)]
 mod tests;
 
@@ -13,6 +15,8 @@ use cryo_span::Spanned;
 
 use crate::{
     expr::{
+        binding_ref::BindingRef,
+        block::Block,
         literal::Literal,
         math_expr::{MathExpr, Operator},
     },
@@ -65,4 +69,8 @@ impl Parse for Expr {
 pub enum ReducedExpr {
     /// A literal expression.
     Literal(Literal),
+    /// A binding reference.
+    BindingRef(BindingRef),
+    /// A block expression.
+    Block(Block),
 }

@@ -12,6 +12,16 @@ pub struct Semi;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Assign;
 
+/// The left curly brace (`{`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct LCurly;
+
+/// The right curly brace (`}`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RCurly;
+
+atom!(LCurly, "{");
+atom!(RCurly, "}");
 atom!(Semi, ";");
 atom!(Assign, "=");
 atom! {

@@ -17,7 +17,7 @@ pub struct Binding {
     /// Optional mutability keyword.
     pub mut_kw: Option<Mut>,
     /// The name of the binding.
-    pub binding_name: BindingRef,
+    pub ident: BindingRef,
     /// The assign token (`=`).
     pub assign: Assign,
     /// The expression of this binding.
