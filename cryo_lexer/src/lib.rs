@@ -302,7 +302,6 @@ impl Lex for TokenType<'_> {
                 return Ok(v);
             }
         }
-
         Err(Error::new(LexicalError::NoMatch, Span::new(0, s.len())))
     }
 }

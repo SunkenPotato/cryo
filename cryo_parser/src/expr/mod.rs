@@ -6,6 +6,7 @@ pub mod binary_expr;
 pub mod block;
 pub mod cond_expr;
 pub mod literal;
+pub mod struct_expr;
 
 #[cfg(test)]
 mod tests;
@@ -19,6 +20,7 @@ use crate::{
         block::Block,
         cond_expr::IfExpr,
         literal::Literal,
+        struct_expr::StructExpr,
     },
     ident::Ident,
     parser::Parse,
@@ -76,4 +78,6 @@ pub enum ReducedExpr {
     Block(Block),
     /// A conditional expression.
     IfExpr(IfExpr),
+    /// A struct constructor expression.
+    StructExpr(StructExpr),
 }

@@ -11,12 +11,12 @@ use crate::{
 /// A block expression.
 #[derive(Parse, PartialEq, Debug)]
 pub struct Block {
-    /// The starting delimiter.
+    /// The opening delimiter.
     pub l_curly: LCurly,
     /// The inner statements.
     pub stmts: Vec<Stmt>,
     /// The tail/return expression.
     pub tail: Option<Box<Expr>>,
-    /// The ending delimiter.
+    /// The closing delimiter.
     pub r_curly: RCurly,
 }

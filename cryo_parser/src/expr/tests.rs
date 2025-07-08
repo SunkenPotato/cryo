@@ -2,7 +2,7 @@ use cryo_span::{Span, Spanned};
 use internment::Intern;
 
 use crate::{
-    atoms::{Assign, Else, If, LCurly, Let, RCurly, Semi},
+    atoms::{Assign, Colon, Comma, Else, If, LCurly, Let, RCurly, Semi},
     error::MetaError,
     expr::{
         Expr, ReducedExpr,
@@ -10,8 +10,10 @@ use crate::{
         block::Block,
         cond_expr::{ElseIfBlock, IfBlock, IfExpr},
         literal::{IntegerLiteral, Literal, StringLiteral},
+        struct_expr::{NamedExpr, StructExpr, StructExprBody},
     },
     ident::Ident,
+    parser::Punct,
     stmt::{Stmt, binding::Binding},
     test_util::{assert_parse, assert_parse_fail, stream},
 };
@@ -384,4 +386,48 @@ fn parse_if_with_else_if_and_else_block() {
             Span::new(0, 79),
         ),
     );
+}
+
+#[test]
+fn parse_struct_expr() {
+    let input = stream("X { a: 0, b: 5 + 5 }");
+
+    assert_parse::<StructExpr>(
+        input,
+        Spanned::new(
+            StructExpr {
+                ident: Ident(Intern::from("X")),
+                body: StructExprBody {
+                    l_paren: LCurly,
+                    fields: Punct {
+                        inner: vec![(
+                            NamedExpr {
+                                field: Ident(Intern::from("a")),
+                                colon: Colon,
+                                expr: Expr::ReducedExpr(ReducedExpr::Literal(
+                                    Literal::IntegerLiteral(IntegerLiteral(0)),
+                                )),
+                            },
+                            Comma,
+                        )],
+                        tail: Some(Box::new(NamedExpr {
+                            field: Ident(Intern::from("b")),
+                            colon: Colon,
+                            expr: Expr::MathExpr(Box::new(MathExpr {
+                                lhs: ReducedExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(
+                                    5,
+                                ))),
+                                op: Operator::Add,
+                                rhs: Expr::ReducedExpr(ReducedExpr::Literal(
+                                    Literal::IntegerLiteral(IntegerLiteral(5)),
+                                )),
+                            })),
+                        })),
+                    },
+                    r_paren: RCurly,
+                },
+            },
+            Span::new(0, 20),
+        ),
+    )
 }

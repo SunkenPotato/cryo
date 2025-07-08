@@ -4,7 +4,7 @@
 
 use cryo_span::{Span, Spanned};
 
-use crate::{Error, FromToken, Lex, Sealed, Token, TokenType, find_token_end};
+use crate::{Error, FromToken, Lex, Sealed, Token, TokenType, extract};
 
 /// An identifier.
 ///
@@ -12,13 +12,19 @@ use crate::{Error, FromToken, Lex, Sealed, Token, TokenType, find_token_end};
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Identifier<'source>(pub &'source str);
 
+fn split_at_ident_end(s: &str) -> (&str, &str) {
+    extract(s, |c| {
+        matches!(c, ',' | ';' | '(' | ')' | '{' | '}' | ':' | ' ')
+    })
+}
+
 fn is_invalid_ident_char(c: char) -> bool {
     !matches!(c, '0'..='9' | 'a'..='z' | 'A'..='Z' | '_')
 }
 
 impl Lex for Identifier<'_> {
     fn lex(s: &str) -> Result<(crate::Token, &str), crate::Error> {
-        let (token, rest) = find_token_end(s);
+        let (token, rest) = split_at_ident_end(s);
 
         let span = Span::new(0, token.len());
         let ('a'..='z' | 'A'..='Z' | '_') = token
