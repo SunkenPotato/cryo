@@ -4,26 +4,38 @@
 
 use crate::atom;
 
-/// A semicolon token (`;`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Semi;
-
-/// An assign token (`=`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Assign;
-
-/// The left curly brace (`{`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct LCurly;
-
-/// The right curly brace (`}`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct RCurly;
-
-atom!(LCurly, "{");
-atom!(RCurly, "}");
-atom!(Semi, ";");
-atom!(Assign, "=");
+atom!(
+    /// The left curly parenthesis.
+    LCurly, "{"
+);
+atom!(
+    /// The right curly parenthesis.
+    RCurly, "}"
+);
+atom!(
+    /// The left parenthesis.
+    LParen, "("
+);
+atom!(
+    /// The right parenthesis.
+    RParen, ")"
+);
+atom!(
+    /// A semicolon.
+    Semi, ";"
+);
+atom!(
+    /// The assign token.
+    Assign, "="
+);
+atom!(
+    /// A comma.
+    Comma, ","
+);
+atom!(
+    /// A colon.
+    Colon, ":"
+);
 atom! {
     /// A keyword.
     ///
@@ -40,7 +52,10 @@ atom! {
         If,
         /// The `else` keyword. Used to define the operation to be executed should an if-statement not be valid.
         #("else")
-        Else
+        Else,
+        /// The `struct` keyword.
+        #("struct")
+        Struct
     }
 }
 

@@ -34,7 +34,7 @@ use std::fmt::Display;
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    atoms::{Assign, Keyword, LCurly, Operators, RCurly, Semi},
+    atoms::{Assign, Colon, Comma, Keyword, LCurly, LParen, Operators, RCurly, RParen, Semi},
     identifier::Identifier,
     literal::Literal,
     stream::TokenStream,
@@ -66,8 +66,13 @@ type Error = Spanned<LexicalError>;
 #[doc(hidden)]
 macro_rules! atom {
     (
+        $(#[$attr:meta])*
         $identifier:ident, $atom:expr
     ) => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        $(#[$attr])*
+        pub struct $identifier;
+
         impl $crate::Lex for $identifier {
             fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
                 let rest = s
@@ -251,6 +256,14 @@ pub enum TokenType<'source> {
     RCurly(RCurly),
     /// The left curly brace ('}')
     LCurly(LCurly),
+    /// The left parenthesis (`(`).
+    LParen(LParen),
+    /// The right parenthesis (`)`).
+    RParen(RParen),
+    /// A comma.
+    Comma(Comma),
+    /// A colon.
+    Colon(Colon),
 }
 
 trait Sealed {}
@@ -275,6 +288,10 @@ impl<'s> TokenType<'s> {
         Semi::lex,
         RCurly::lex,
         LCurly::lex,
+        Comma::lex,
+        LParen::lex,
+        RParen::lex,
+        Colon::lex,
     ];
 }
 
