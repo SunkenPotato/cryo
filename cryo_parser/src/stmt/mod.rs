@@ -9,7 +9,7 @@ mod tests;
 
 use cryo_parser_proc_macro::Parse;
 
-use crate::{atoms::Semi, expr::Expr, stmt::binding::Binding};
+use crate::{atoms::Semi, expr::Expr, item::Item, stmt::binding::Binding};
 
 /// A statement as an expression. This is simply an expression followed by a semicolon.
 #[derive(Parse, PartialEq, Debug)]
@@ -29,4 +29,6 @@ pub enum Stmt {
     ExprStmt(ExprStmt),
     /// A binding.
     Binding(Binding),
+    /// A nested item.
+    Item(Item),
 }

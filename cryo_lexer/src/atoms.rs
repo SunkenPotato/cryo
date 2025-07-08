@@ -55,7 +55,10 @@ atom! {
         Else,
         /// The `struct` keyword.
         #("struct")
-        Struct
+        Struct,
+        /// The `fun` keyword. Used to define functions.
+        #("fun")
+        Fun
     }
 }
 

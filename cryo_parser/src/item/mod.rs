@@ -5,6 +5,7 @@
 #[cfg(test)]
 mod tests;
 
+pub mod fn_def;
 pub mod struct_item;
 
 // #[derive(Parse)]
@@ -17,7 +18,11 @@ pub mod struct_item;
 
 use cryo_parser_proc_macro::Parse;
 
-use crate::{atoms::Colon, ident::Ident, item::struct_item::StructDef};
+use crate::{
+    atoms::Colon,
+    ident::Ident,
+    item::{fn_def::FnDef, struct_item::StructDef},
+};
 
 /// A typed binding.
 ///
@@ -37,4 +42,6 @@ pub struct TypedBinding {
 pub enum Item {
     /// A struct item.
     Struct(StructDef),
+    /// A function definition.
+    FnDef(FnDef),
 }

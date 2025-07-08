@@ -125,3 +125,8 @@ atom!(
     /// The struct keyword.
     Struct, Keyword::Struct
 );
+
+atom!(
+    /// The `fun` keyword.
+    Fun, Keyword::Fun
+);
