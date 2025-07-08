@@ -5,7 +5,7 @@ use crate::{
     atoms::{Assign, Let, Mut, Semi},
     expr::{
         Expr, ReducedExpr,
-        binary_expr::MathExpr,
+        binary_expr::BinaryExpr,
         literal::{IntegerLiteral, Literal},
     },
     ident::Ident,
@@ -21,7 +21,7 @@ fn parse_expr_stmt() {
         input,
         Spanned::new(
             Stmt::ExprStmt(ExprStmt {
-                expr: Expr::MathExpr(Box::new(MathExpr {
+                expr: Expr::BinaryExpr(Box::new(BinaryExpr {
                     lhs: ReducedExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(5))),
                     op: crate::expr::binary_expr::Operator::Add,
                     rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(

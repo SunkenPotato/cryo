@@ -11,7 +11,7 @@ use cryo_parser_proc_macro::Parse;
 ///
 /// This consists of a left-hand [`ReducedExpr`], an [`Operator`], and a right-hand side [`Expr`].
 #[derive(Parse, Debug, PartialEq)]
-pub struct MathExpr {
+pub struct BinaryExpr {
     /// The left-hand side of this expression.
     pub lhs: ReducedExpr,
     /// The operator.

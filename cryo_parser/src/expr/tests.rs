@@ -6,7 +6,7 @@ use crate::{
     error::MetaError,
     expr::{
         Expr, ReducedExpr,
-        binary_expr::{MathExpr, Operator},
+        binary_expr::{BinaryExpr, Operator},
         block::Block,
         cond_expr::{ElseIfBlock, IfBlock, IfExpr},
         literal::{IntegerLiteral, Literal, StringLiteral},
@@ -55,10 +55,10 @@ fn parse_op() {
 #[test]
 fn parse_math_expr() {
     let stream = stream("5 + 4");
-    assert_parse::<MathExpr>(
+    assert_parse::<BinaryExpr>(
         stream,
         Spanned::new(
-            MathExpr {
+            BinaryExpr {
                 lhs: ReducedExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(5))),
                 op: super::binary_expr::Operator::Add,
                 rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
@@ -359,7 +359,7 @@ fn parse_if_with_else_if_and_else_block() {
                                     )),
                                     semi: Semi,
                                 })],
-                                tail: Some(Box::new(Expr::MathExpr(Box::new(MathExpr {
+                                tail: Some(Box::new(Expr::BinaryExpr(Box::new(BinaryExpr {
                                     lhs: ReducedExpr::BindingRef(Ident(Intern::from("y"))),
                                     op: Operator::Add,
                                     rhs: Expr::ReducedExpr(ReducedExpr::Literal(
@@ -413,7 +413,7 @@ fn parse_struct_expr() {
                         tail: Some(Box::new(NamedExpr {
                             field: Ident(Intern::from("b")),
                             colon: Colon,
-                            expr: Expr::MathExpr(Box::new(MathExpr {
+                            expr: Expr::BinaryExpr(Box::new(BinaryExpr {
                                 lhs: ReducedExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(
                                     5,
                                 ))),

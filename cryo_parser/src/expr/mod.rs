@@ -5,6 +5,7 @@
 pub mod binary_expr;
 pub mod block;
 pub mod cond_expr;
+pub mod fn_call;
 pub mod literal;
 pub mod struct_expr;
 
@@ -16,9 +17,10 @@ use cryo_span::Spanned;
 
 use crate::{
     expr::{
-        binary_expr::{MathExpr, Operator},
+        binary_expr::{BinaryExpr, Operator},
         block::Block,
         cond_expr::IfExpr,
+        fn_call::FnCall,
         literal::Literal,
         struct_expr::StructExpr,
     },
@@ -35,7 +37,7 @@ use crate::{
 #[derive(Debug, PartialEq)]
 pub enum Expr {
     /// An arithmetic expression.
-    MathExpr(Box<MathExpr>),
+    BinaryExpr(Box<BinaryExpr>),
     /// Any other expression type.
     ReducedExpr(ReducedExpr),
 }
@@ -54,7 +56,7 @@ impl Parse for Expr {
             let (rhs, rhs_span) = tokens.with(Self::parse)?.tuple();
             let span = lhs.span + op_span + rhs_span;
             Ok(Spanned::new(
-                Self::MathExpr(Box::new(MathExpr {
+                Self::BinaryExpr(Box::new(BinaryExpr {
                     lhs: lhs.t,
                     op,
                     rhs,
@@ -80,4 +82,6 @@ pub enum ReducedExpr {
     IfExpr(IfExpr),
     /// A struct constructor expression.
     StructExpr(StructExpr),
+    /// A function call.
+    FnCall(FnCall),
 }
