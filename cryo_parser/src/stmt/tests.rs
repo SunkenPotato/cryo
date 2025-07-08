@@ -6,9 +6,9 @@ use crate::{
     expr::{
         Expr, ReducedExpr,
         binary_expr::MathExpr,
-        binding_ref::BindingRef,
         literal::{IntegerLiteral, Literal},
     },
+    ident::Ident,
     stmt::{ExprStmt, Stmt, binding::Binding},
     test_util::{assert_parse, stream},
 };
@@ -45,7 +45,7 @@ fn parse_immutable_binding() {
             Binding {
                 let_kw: Let,
                 mut_kw: None,
-                ident: BindingRef(Intern::from("x")),
+                ident: Ident(Intern::from("x")),
                 assign: Assign,
                 rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
                     IntegerLiteral(5),
@@ -67,7 +67,7 @@ fn parse_mutable_binding() {
             Binding {
                 let_kw: Let,
                 mut_kw: Some(Mut),
-                ident: BindingRef(Intern::from("x")),
+                ident: Ident(Intern::from("x")),
                 assign: Assign,
                 rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
                     IntegerLiteral(7),

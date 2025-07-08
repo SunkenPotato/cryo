@@ -3,7 +3,6 @@
 //! Expressions are components of programming languages that, when evaluated, return a value.
 
 pub mod binary_expr;
-pub mod binding_ref;
 pub mod block;
 pub mod cond_expr;
 pub mod literal;
@@ -17,11 +16,11 @@ use cryo_span::Spanned;
 use crate::{
     expr::{
         binary_expr::{MathExpr, Operator},
-        binding_ref::BindingRef,
         block::Block,
         cond_expr::IfExpr,
         literal::Literal,
     },
+    ident::Ident,
     parser::Parse,
 };
 
@@ -72,7 +71,7 @@ pub enum ReducedExpr {
     /// A literal expression.
     Literal(Literal),
     /// A binding reference.
-    BindingRef(BindingRef),
+    BindingRef(Ident),
     /// A block expression.
     Block(Block),
     /// A conditional expression.

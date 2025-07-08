@@ -7,11 +7,11 @@ use crate::{
     expr::{
         Expr, ReducedExpr,
         binary_expr::{MathExpr, Operator},
-        binding_ref::BindingRef,
         block::Block,
         cond_expr::{ElseIfBlock, IfBlock, IfExpr},
         literal::{IntegerLiteral, Literal, StringLiteral},
     },
+    ident::Ident,
     stmt::{Stmt, binding::Binding},
     test_util::{assert_parse, assert_parse_fail, stream},
 };
@@ -72,9 +72,9 @@ fn parse_math_expr() {
 fn parse_binding_ref() {
     let stream = stream("binding");
 
-    assert_parse::<BindingRef>(
+    assert_parse::<Ident>(
         stream,
-        Spanned::new(BindingRef(Intern::from("binding")), Span::new(0, 7)),
+        Spanned::new(Ident(Intern::from("binding")), Span::new(0, 7)),
     );
 }
 
@@ -110,7 +110,7 @@ fn parse_block_expr_only_stmts() {
                 stmts: vec![Stmt::Binding(Binding {
                     let_kw: Let,
                     mut_kw: None,
-                    ident: BindingRef(Intern::from("x")),
+                    ident: Ident(Intern::from("x")),
                     assign: Assign,
                     rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
                         IntegerLiteral(5),
@@ -137,16 +137,16 @@ fn parse_block_expr_stmts_tail_expr() {
                 stmts: vec![Stmt::Binding(Binding {
                     let_kw: Let,
                     mut_kw: None,
-                    ident: BindingRef(Intern::from("x")),
+                    ident: Ident(Intern::from("x")),
                     assign: Assign,
                     rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
                         IntegerLiteral(5),
                     ))),
                     semi: Semi,
                 })],
-                tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::BindingRef(
-                    BindingRef(Intern::from("x")),
-                )))),
+                tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::BindingRef(Ident(
+                    Intern::from("x"),
+                ))))),
                 r_curly: RCurly,
             },
             Span::new(0, 16),
@@ -324,7 +324,7 @@ fn parse_if_with_else_if_and_else_block() {
                                 stmts: vec![Stmt::Binding(Binding {
                                     let_kw: Let,
                                     mut_kw: None,
-                                    ident: BindingRef(Intern::from("x")),
+                                    ident: Ident(Intern::from("x")),
                                     assign: Assign,
                                     rhs: Expr::ReducedExpr(ReducedExpr::Literal(
                                         Literal::IntegerLiteral(IntegerLiteral(4)),
@@ -332,7 +332,7 @@ fn parse_if_with_else_if_and_else_block() {
                                     semi: Semi,
                                 })],
                                 tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::BindingRef(
-                                    BindingRef(Intern::from("x")),
+                                    Ident(Intern::from("x")),
                                 )))),
                                 r_curly: RCurly,
                             },
@@ -350,7 +350,7 @@ fn parse_if_with_else_if_and_else_block() {
                                 stmts: vec![Stmt::Binding(Binding {
                                     let_kw: Let,
                                     mut_kw: None,
-                                    ident: BindingRef(Intern::from("y")),
+                                    ident: Ident(Intern::from("y")),
                                     assign: Assign,
                                     rhs: Expr::ReducedExpr(ReducedExpr::Literal(
                                         Literal::IntegerLiteral(IntegerLiteral(6)),
@@ -358,7 +358,7 @@ fn parse_if_with_else_if_and_else_block() {
                                     semi: Semi,
                                 })],
                                 tail: Some(Box::new(Expr::MathExpr(Box::new(MathExpr {
-                                    lhs: ReducedExpr::BindingRef(BindingRef(Intern::from("y"))),
+                                    lhs: ReducedExpr::BindingRef(Ident(Intern::from("y"))),
                                     op: Operator::Add,
                                     rhs: Expr::ReducedExpr(ReducedExpr::Literal(
                                         Literal::IntegerLiteral(IntegerLiteral(0)),

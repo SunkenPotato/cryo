@@ -6,7 +6,8 @@ use cryo_parser_proc_macro::Parse;
 
 use crate::{
     atoms::{Assign, Let, Mut, Semi},
-    expr::{Expr, binding_ref::BindingRef},
+    expr::Expr,
+    ident::Ident,
 };
 
 /// A binding.
@@ -17,7 +18,7 @@ pub struct Binding {
     /// Optional mutability keyword.
     pub mut_kw: Option<Mut>,
     /// The name of the binding.
-    pub ident: BindingRef,
+    pub ident: Ident,
     /// The assign token (`=`).
     pub assign: Assign,
     /// The expression of this binding.

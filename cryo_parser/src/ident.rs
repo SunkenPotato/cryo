@@ -1,17 +1,14 @@
-//! A binding reference.
-//!
-//! This is simply an identifier.
-
+//! Identifiers.
 use cryo_lexer::identifier::Identifier;
 use internment::Intern;
 
 use crate::parser::Parse;
 
-/// A binding reference.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BindingRef(pub Intern<str>);
+/// An identifier.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub struct Ident(pub Intern<str>);
 
-impl Parse for BindingRef {
+impl Parse for Ident {
     type Output = Self;
 
     fn parse(

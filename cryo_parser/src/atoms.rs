@@ -4,7 +4,10 @@
 
 use crate::parser::Parse;
 use cryo_lexer::{
-    atoms::{Assign as AToken, Keyword, LCurly as LCToken, RCurly as RCToken, Semi as SToken},
+    atoms::{
+        Assign as AToken, Colon as ColToken, Comma as CToken, Keyword, LCurly as LCToken,
+        LParen as LPToken, RCurly as RCToken, RParen as RPToken, Semi as SToken,
+    },
     stream::TokenStreamError,
 };
 use cryo_span::Spanned;
@@ -96,4 +99,29 @@ atom!(
 atom!(
     /// The `else` keyword.
     Else, Keyword::Else
+);
+
+atom!(
+    /// A comma.
+    Comma, CToken
+);
+
+atom!(
+    /// A colon.
+    Colon, ColToken
+);
+
+atom!(
+    /// A left parenthesis.
+    LParen, LPToken
+);
+
+atom!(
+    /// A right parenthesis.
+    RParen, RPToken
+);
+
+atom!(
+    /// The struct keyword.
+    Struct, Keyword::Struct
 );

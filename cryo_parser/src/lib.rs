@@ -7,6 +7,8 @@
 pub mod atoms;
 pub mod error;
 pub mod expr;
+pub mod ident;
+pub mod item;
 pub mod parser;
 pub mod stmt;
 

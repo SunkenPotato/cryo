@@ -93,6 +93,42 @@ impl<T: Parse, const N: usize> Parse for [T; N] {
     }
 }
 
+/// Utility for parsing sequences of `T` punctuated by `P`.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Punct<T, P> {
+    /// The fields.
+    pub inner: Vec<(T, P)>,
+    /// The last field, does not require a `P`.
+    pub tail: Option<Box<T>>,
+}
+
+impl<T, P> Parse for Punct<T, P>
+where
+    T: Parse,
+    P: Parse,
+{
+    type Output = Punct<T::Output, P::Output>;
+
+    fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
+        let mut inner = vec![];
+        let mut tail = None;
+        let mut span = Span::ZERO;
+
+        while let Ok(t) = tokens.with(T::parse) {
+            span += t.span;
+            if let Ok(p) = tokens.with(P::parse) {
+                span += p.span;
+                inner.push((t.t, p.t))
+            } else {
+                tail = Some(Box::new(t.t));
+                break;
+            }
+        }
+
+        Ok(Spanned::new(Punct { inner, tail }, span))
+    }
+}
+
 /// A utility for parsing terminals which require exactly one token.
 ///
 /// The closure supplied must take a type which implements [`cryo_lexer::FromToken`] and effectively return a [`ParseResult`].
