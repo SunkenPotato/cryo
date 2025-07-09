@@ -17,11 +17,19 @@ pub type ParseResult<T> = Result<S<T>, Box<dyn ParseError>>;
 /// A parser.
 ///
 /// For non-terminals, it is often enough to derive this trait.
+#[allow(unused)]
 pub trait Parse: Sized {
     /// The type that this parser returns (often `Self`).
     type Output;
     /// The actual parser.
     fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output>;
+    /// Parses with precedence.
+    fn parse_with_precedence(
+        tokens: &mut TokenStreamGuard,
+        min_prec: u8,
+    ) -> ParseResult<Self::Output> {
+        Self::parse(tokens)
+    }
 }
 
 impl Parse for () {
@@ -38,6 +46,13 @@ impl<T: Parse> Parse for Box<T> {
     fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
         tokens.with(T::parse).map(|v| v.map(Box::new))
     }
+
+    fn parse_with_precedence(
+        tokens: &mut TokenStreamGuard,
+        min_prec: u8,
+    ) -> ParseResult<Self::Output> {
+        T::parse_with_precedence(tokens, min_prec).map(|v| v.map(Box::new))
+    }
 }
 
 impl<T: Parse> Parse for Option<T> {
@@ -51,6 +66,13 @@ impl<T: Parse> Parse for Option<T> {
                 _ => Err(e),
             },
         }
+    }
+
+    fn parse_with_precedence(
+        tokens: &mut TokenStreamGuard,
+        min_prec: u8,
+    ) -> ParseResult<Self::Output> {
+        T::parse_with_precedence(tokens, min_prec).map(|v| v.map(Option::Some))
     }
 }
 
@@ -83,6 +105,36 @@ impl<T: Parse> Parse for Vec<T> {
 
         Ok(Spanned::new(vec, span))
     }
+
+    fn parse_with_precedence(
+        tokens: &mut TokenStreamGuard,
+        min_prec: u8,
+    ) -> ParseResult<Self::Output> {
+        let mut vec = vec![];
+        let mut span = Span::ZERO;
+
+        let current_span = match tokens.peek() {
+            Ok(Spanned {
+                span: current_span, ..
+            }) => *current_span,
+            _ => return Ok(Spanned::new(vec, span)),
+        };
+
+        while let Ok(v) = tokens.with(|g| T::parse_with_precedence(g, min_prec)) {
+            vec.push(v.t);
+            if vec.len() == 1 {
+                span = v.span;
+            } else {
+                span += v.span
+            }
+        }
+
+        if vec.is_empty() {
+            span = current_span;
+        }
+
+        Ok(Spanned::new(vec, span))
+    }
 }
 
 impl<T: Parse, const N: usize> Parse for [T; N] {
@@ -90,6 +142,14 @@ impl<T: Parse, const N: usize> Parse for [T; N] {
 
     fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
         core::array::try_from_fn(|_| tokens.with(T::parse)).map(Into::into)
+    }
+
+    fn parse_with_precedence(
+        tokens: &mut TokenStreamGuard,
+        min_prec: u8,
+    ) -> ParseResult<Self::Output> {
+        core::array::try_from_fn(|_| tokens.with(|g| T::parse_with_precedence(g, min_prec)))
+            .map(Into::into)
     }
 }
 
@@ -115,6 +175,28 @@ where
         let mut span = Span::ZERO;
 
         while let Ok(t) = tokens.with(T::parse) {
+            span += t.span;
+            if let Ok(p) = tokens.with(P::parse) {
+                span += p.span;
+                inner.push((t.t, p.t))
+            } else {
+                tail = Some(Box::new(t.t));
+                break;
+            }
+        }
+
+        Ok(Spanned::new(Punct { inner, tail }, span))
+    }
+
+    fn parse_with_precedence(
+        tokens: &mut TokenStreamGuard,
+        min_prec: u8,
+    ) -> ParseResult<Self::Output> {
+        let mut inner = vec![];
+        let mut tail = None;
+        let mut span = Span::ZERO;
+
+        while let Ok(t) = tokens.with(|g| T::parse_with_precedence(g, min_prec)) {
             span += t.span;
             if let Ok(p) = tokens.with(P::parse) {
                 span += p.span;
