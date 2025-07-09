@@ -14,7 +14,7 @@ pub struct Identifier<'source>(pub &'source str);
 
 fn split_at_ident_end(s: &str) -> (&str, &str) {
     extract(s, |c| {
-        matches!(c, ',' | ';' | '(' | ')' | '{' | '}' | ':' | ' ')
+        matches!(c, ',' | ';' | '(' | ')' | '{' | '}' | ':' | '.' | ' ')
     })
 }
 

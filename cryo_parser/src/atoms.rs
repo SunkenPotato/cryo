@@ -5,8 +5,8 @@
 use crate::parser::Parse;
 use cryo_lexer::{
     atoms::{
-        Assign as AToken, Colon as ColToken, Comma as CToken, Keyword, LCurly as LCToken,
-        LParen as LPToken, RCurly as RCToken, RParen as RPToken, Semi as SToken,
+        Assign as AToken, Colon as ColToken, Comma as CToken, Dot as DToken, Keyword,
+        LCurly as LCToken, LParen as LPToken, RCurly as RCToken, RParen as RPToken, Semi as SToken,
     },
     stream::TokenStreamError,
 };
@@ -129,4 +129,9 @@ atom!(
 atom!(
     /// The `fun` keyword.
     Fun, Keyword::Fun
+);
+
+atom!(
+    /// A dot.
+    Dot, DToken
 );

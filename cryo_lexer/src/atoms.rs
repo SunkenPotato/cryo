@@ -36,6 +36,12 @@ atom!(
     /// A colon.
     Colon, ":"
 );
+
+atom!(
+    /// A dot.
+    Dot, "."
+);
+
 atom! {
     /// A keyword.
     ///

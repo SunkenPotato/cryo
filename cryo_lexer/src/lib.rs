@@ -34,7 +34,7 @@ use std::fmt::Display;
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    atoms::{Assign, Colon, Comma, Keyword, LCurly, LParen, Operators, RCurly, RParen, Semi},
+    atoms::{Assign, Colon, Comma, Dot, Keyword, LCurly, LParen, Operators, RCurly, RParen, Semi},
     identifier::Identifier,
     literal::Literal,
     stream::TokenStream,
@@ -264,6 +264,8 @@ pub enum TokenType<'source> {
     Comma(Comma),
     /// A colon.
     Colon(Colon),
+    /// A dot.
+    Dot(Dot),
 }
 
 trait Sealed {}
@@ -292,6 +294,7 @@ impl<'s> TokenType<'s> {
         LParen::lex,
         RParen::lex,
         Colon::lex,
+        Dot::lex,
     ];
 }
 
