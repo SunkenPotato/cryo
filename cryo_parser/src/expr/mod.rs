@@ -13,15 +13,10 @@ pub mod struct_expr;
 mod tests;
 
 use cryo_parser_proc_macro::Parse;
-use cryo_span::Spanned;
 
 use crate::{
     expr::{
-        binary_expr::{BinaryExpr, Operator},
-        block::Block,
-        cond_expr::IfExpr,
-        fn_call::FnCall,
-        literal::Literal,
+        binary_expr::BinaryExpr, block::Block, cond_expr::IfExpr, literal::Literal,
         struct_expr::StructExpr,
     },
     ident::Ident,
@@ -29,49 +24,28 @@ use crate::{
 };
 
 /// An expression.
-///
-/// `Expr` is split up into `MathExpr` and `ReducedExpr` to ease `MathExpr` parsing.
-///
-/// For the other expression types, view [`ReducedExpr`].
 // derive(Parse) cannot be applied to this to prevent double ReducedExpr parsing
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-    /// An arithmetic expression.
-    BinaryExpr(Box<BinaryExpr>),
-    /// Any other expression type.
-    ReducedExpr(ReducedExpr),
+    /// A base expression.
+    BaseExpr(BaseExpr),
+    /// A binary expression.
+    BinaryExpr(BinaryExpr),
 }
 
 impl Parse for Expr {
     type Output = Self;
+    #[expect(unused)]
     fn parse(
         tokens: &mut cryo_lexer::stream::TokenStreamGuard,
     ) -> crate::parser::ParseResult<Self::Output> {
-        let lhs = tokens.with(ReducedExpr::parse)?;
-        if let Ok(Spanned {
-            t: op,
-            span: op_span,
-        }) = tokens.with(Operator::parse)
-        {
-            let (rhs, rhs_span) = tokens.with(Self::parse)?.tuple();
-            let span = lhs.span + op_span + rhs_span;
-            Ok(Spanned::new(
-                Self::BinaryExpr(Box::new(BinaryExpr {
-                    lhs: lhs.t,
-                    op,
-                    rhs,
-                })),
-                span,
-            ))
-        } else {
-            Ok(lhs.map(Self::ReducedExpr))
-        }
+        todo!()
     }
 }
 
 /// Expressions excluding `MathExpr`.
 #[derive(Parse, Debug, PartialEq)]
-pub enum ReducedExpr {
+pub enum BaseExpr {
     /// A literal expression.
     Literal(Literal),
     /// A binding reference.
@@ -82,6 +56,4 @@ pub enum ReducedExpr {
     IfExpr(IfExpr),
     /// A struct constructor expression.
     StructExpr(StructExpr),
-    /// A function call.
-    FnCall(FnCall),
 }

@@ -4,7 +4,7 @@ use internment::Intern;
 use crate::{
     atoms::{Assign, Let, Mut, Semi},
     expr::{
-        Expr, ReducedExpr,
+        BaseExpr, Expr,
         binary_expr::BinaryExpr,
         literal::{IntegerLiteral, Literal},
     },
@@ -21,13 +21,13 @@ fn parse_expr_stmt() {
         input,
         Spanned::new(
             Stmt::ExprStmt(ExprStmt {
-                expr: Expr::BinaryExpr(Box::new(BinaryExpr {
-                    lhs: ReducedExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(5))),
+                expr: Expr::BinaryExpr(BinaryExpr {
+                    lhs: BaseExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(5))),
                     op: crate::expr::binary_expr::Operator::Add,
-                    rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
+                    rhs: Box::new(Expr::BaseExpr(BaseExpr::Literal(Literal::IntegerLiteral(
                         IntegerLiteral(5),
-                    ))),
-                })),
+                    )))),
+                }),
                 semi: Semi,
             }),
             Span::new(0, 6),
@@ -47,9 +47,9 @@ fn parse_immutable_binding() {
                 mut_kw: None,
                 ident: Ident(Intern::from("x")),
                 assign: Assign,
-                rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
-                    IntegerLiteral(5),
-                ))),
+                rhs: Expr::BaseExpr(BaseExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(
+                    5,
+                )))),
                 semi: Semi,
             },
             Span::new(0, 10),
@@ -69,9 +69,9 @@ fn parse_mutable_binding() {
                 mut_kw: Some(Mut),
                 ident: Ident(Intern::from("x")),
                 assign: Assign,
-                rhs: Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
-                    IntegerLiteral(7),
-                ))),
+                rhs: Expr::BaseExpr(BaseExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(
+                    7,
+                )))),
                 semi: Semi,
             },
             Span::new(0, 14),

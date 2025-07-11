@@ -4,8 +4,8 @@ use internment::Intern;
 use crate::{
     atoms::{Colon, Comma, Fun, LCurly, LParen, RCurly, RParen, Struct},
     expr::{
-        Expr, ReducedExpr,
-        binary_expr::BinaryExpr,
+        BaseExpr, Expr,
+        binary_expr::{BinaryExpr, Operator},
         block::Block,
         fn_call::FnCall,
         literal::{IntegerLiteral, Literal},
@@ -75,7 +75,7 @@ fn parse_fn_def_no_args_no_ret() {
                 body: Block {
                     l_curly: LCurly,
                     stmts: vec![],
-                    tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                    tail: Some(Box::new(Expr::BaseExpr(BaseExpr::Literal(
                         Literal::IntegerLiteral(IntegerLiteral(5)),
                     )))),
                     r_curly: RCurly,
@@ -120,11 +120,13 @@ fn parse_fn_def_args_ret() {
                 body: Block {
                     l_curly: LCurly,
                     stmts: vec![],
-                    tail: Some(Box::new(Expr::BinaryExpr(Box::new(BinaryExpr {
-                        lhs: ReducedExpr::BindingRef(Ident(Intern::from("a"))),
-                        op: crate::expr::binary_expr::Operator::Add,
-                        rhs: Expr::ReducedExpr(ReducedExpr::BindingRef(Ident(Intern::from("b")))),
-                    })))),
+                    tail: Some(Box::new(Expr::BinaryExpr(BinaryExpr {
+                        lhs: BaseExpr::BindingRef(Ident(Intern::from("a"))),
+                        op: Operator::Add,
+                        rhs: Box::new(Expr::BaseExpr(BaseExpr::BindingRef(Ident(Intern::from(
+                            "b",
+                        ))))),
+                    }))),
                     r_curly: RCurly,
                 },
             },
@@ -145,12 +147,12 @@ fn parse_fn_call() {
                 l_arg_paren: LParen,
                 args: Punct {
                     inner: vec![(
-                        Expr::ReducedExpr(ReducedExpr::Literal(Literal::IntegerLiteral(
-                            IntegerLiteral(1),
-                        ))),
+                        Expr::BaseExpr(BaseExpr::Literal(Literal::IntegerLiteral(IntegerLiteral(
+                            1,
+                        )))),
                         Comma,
                     )],
-                    tail: Some(Box::new(Expr::ReducedExpr(ReducedExpr::Literal(
+                    tail: Some(Box::new(Expr::BaseExpr(BaseExpr::Literal(
                         Literal::IntegerLiteral(IntegerLiteral(2)),
                     )))),
                 },

@@ -1,23 +1,23 @@
 //! Arithmetic expressions.
 
 use crate::{
-    expr::{Expr, ReducedExpr},
+    expr::{BaseExpr, Expr},
     parser::Parse,
 };
 use cryo_lexer::atoms::Operators as OToken;
-use cryo_parser_proc_macro::Parse;
 
 /// A binary expression.
 ///
-/// This consists of a left-hand [`ReducedExpr`], an [`Operator`], and a right-hand side [`Expr`].
-#[derive(Parse, Debug, PartialEq)]
+/// This consists of a left-hand [`BaseExpr`], an [`Operator`], and a right-hand side [`Expr`].
+// this type should not implement Parse
+#[derive(Debug, PartialEq)]
 pub struct BinaryExpr {
     /// The left-hand side of this expression.
-    pub lhs: ReducedExpr,
+    pub lhs: BaseExpr,
     /// The operator.
     pub op: Operator,
     /// The right-hand side.
-    pub rhs: Expr,
+    pub rhs: Box<Expr>,
 }
 
 /// Operators used for binary expressions.
@@ -37,6 +37,17 @@ pub enum Operator {
     Eq,
     /// The inequality operator (`!=`).
     NotEq,
+}
+
+impl Operator {
+    /// Returns the precedence level for this operator.
+    pub fn precedence(&self) -> u8 {
+        match self {
+            Operator::Mul | Operator::Div | Operator::Rem => 60,
+            Operator::Add | Operator::Sub => 50,
+            Operator::NotEq | Operator::Eq => 40,
+        }
+    }
 }
 
 impl Parse for Operator {

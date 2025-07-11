@@ -7,6 +7,7 @@
 //! Furthermore, each parse error type implements [`std::fmt::Display`].
 //!
 //! To declare a parse error type, view [`parse_error`](cryo_parser::parse_error).
+// TODO refactor this to be a concrete struct instead of a trait
 
 #![allow(private_bounds)]
 
