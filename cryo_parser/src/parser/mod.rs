@@ -12,7 +12,7 @@ use crate::{S, error::ParseError};
 pub mod combinators;
 
 /// The result of a parser.
-pub type ParseResult<T> = Result<S<T>, Box<dyn ParseError>>;
+pub type ParseResult<T> = Result<S<T>, ParseError>;
 
 /// A parser.
 ///
@@ -23,13 +23,6 @@ pub trait Parse: Sized {
     type Output;
     /// The actual parser.
     fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output>;
-    /// Parses with precedence.
-    fn parse_with_precedence(
-        tokens: &mut TokenStreamGuard,
-        min_prec: u8,
-    ) -> ParseResult<Self::Output> {
-        Self::parse(tokens)
-    }
 }
 
 impl Parse for () {
@@ -46,13 +39,6 @@ impl<T: Parse> Parse for Box<T> {
     fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
         tokens.with(T::parse).map(|v| v.map(Box::new))
     }
-
-    fn parse_with_precedence(
-        tokens: &mut TokenStreamGuard,
-        min_prec: u8,
-    ) -> ParseResult<Self::Output> {
-        T::parse_with_precedence(tokens, min_prec).map(|v| v.map(Box::new))
-    }
 }
 
 impl<T: Parse> Parse for Option<T> {
@@ -62,17 +48,10 @@ impl<T: Parse> Parse for Option<T> {
         match tokens.with(T::parse) {
             Ok(v) => Ok(v.map(Option::Some)),
             Err(e) => match (e.code(), e.subcode()) {
-                (0, 0 | 1) => Ok(Spanned::new(None, *e.span())),
+                (0, 0 | 1) => Ok(Spanned::new(None, e.span)),
                 _ => Err(e),
             },
         }
-    }
-
-    fn parse_with_precedence(
-        tokens: &mut TokenStreamGuard,
-        min_prec: u8,
-    ) -> ParseResult<Self::Output> {
-        T::parse_with_precedence(tokens, min_prec).map(|v| v.map(Option::Some))
     }
 }
 
@@ -105,51 +84,20 @@ impl<T: Parse> Parse for Vec<T> {
 
         Ok(Spanned::new(vec, span))
     }
-
-    fn parse_with_precedence(
-        tokens: &mut TokenStreamGuard,
-        min_prec: u8,
-    ) -> ParseResult<Self::Output> {
-        let mut vec = vec![];
-        let mut span = Span::ZERO;
-
-        let current_span = match tokens.peek() {
-            Ok(Spanned {
-                span: current_span, ..
-            }) => *current_span,
-            _ => return Ok(Spanned::new(vec, span)),
-        };
-
-        while let Ok(v) = tokens.with(|g| T::parse_with_precedence(g, min_prec)) {
-            vec.push(v.t);
-            if vec.len() == 1 {
-                span = v.span;
-            } else {
-                span += v.span
-            }
-        }
-
-        if vec.is_empty() {
-            span = current_span;
-        }
-
-        Ok(Spanned::new(vec, span))
-    }
 }
 
 impl<T: Parse, const N: usize> Parse for [T; N] {
     type Output = [T::Output; N];
 
     fn parse(tokens: &mut TokenStreamGuard) -> ParseResult<Self::Output> {
-        core::array::try_from_fn(|_| tokens.with(T::parse)).map(Into::into)
-    }
+        fn transpose<T, const N: usize>(val: [Spanned<T>; N]) -> Spanned<[T; N]> {
+            let span = val.iter().fold(Span::ZERO, |a, b| a + b.span);
+            let items = val.map(|s| s.t);
 
-    fn parse_with_precedence(
-        tokens: &mut TokenStreamGuard,
-        min_prec: u8,
-    ) -> ParseResult<Self::Output> {
-        core::array::try_from_fn(|_| tokens.with(|g| T::parse_with_precedence(g, min_prec)))
-            .map(Into::into)
+            Spanned { t: items, span }
+        }
+
+        core::array::try_from_fn(|_| tokens.with(T::parse)).map(transpose)
     }
 }
 
@@ -187,28 +135,6 @@ where
 
         Ok(Spanned::new(Punct { inner, tail }, span))
     }
-
-    fn parse_with_precedence(
-        tokens: &mut TokenStreamGuard,
-        min_prec: u8,
-    ) -> ParseResult<Self::Output> {
-        let mut inner = vec![];
-        let mut tail = None;
-        let mut span = Span::ZERO;
-
-        while let Ok(t) = tokens.with(|g| T::parse_with_precedence(g, min_prec)) {
-            span += t.span;
-            if let Ok(p) = tokens.with(P::parse) {
-                span += p.span;
-                inner.push((t.t, p.t))
-            } else {
-                tail = Some(Box::new(t.t));
-                break;
-            }
-        }
-
-        Ok(Spanned::new(Punct { inner, tail }, span))
-    }
 }
 
 /// A utility for parsing terminals which require exactly one token.
@@ -217,10 +143,10 @@ where
 pub fn terminal<'source, T, R, E, F>(
     stream: &mut TokenStream<'source>,
     f: F,
-) -> Result<Spanned<R>, Box<dyn ParseError>>
+) -> Result<Spanned<R>, ParseError>
 where
     T: FromToken<'source>,
-    E: ParseError + 'static,
+    E: Into<ParseError> + 'static,
     F: FnOnce(&T) -> Result<Spanned<R>, E>,
 {
     stream.with(|guard| {

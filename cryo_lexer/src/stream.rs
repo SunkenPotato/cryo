@@ -48,7 +48,7 @@ impl<'source> TokenStream<'source> {
 }
 
 /// A token stream error.
-#[cfg_attr(test, derive(Debug, PartialEq))] // only for tests, since all externals use dyn ParseError
+#[derive(Debug, PartialEq, Eq)] // only for tests, since all externals use dyn ParseError
 pub enum TokenStreamError {
     /// An unexpected end of input was reached.
     EndOfInput,

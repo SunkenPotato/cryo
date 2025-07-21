@@ -155,3 +155,14 @@ impl SourceMap {
         self.files.get(idx)
     }
 }
+
+#[cfg(test)]
+impl Default for SourceMap {
+    fn default() -> Self {
+        use index_vec::index_vec;
+
+        Self {
+            files: index_vec![],
+        }
+    }
+}

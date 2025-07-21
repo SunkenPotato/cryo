@@ -41,15 +41,18 @@ mod test_util {
     }
 
     #[track_caller]
-    pub(crate) fn assert_parse_fail<T>(mut tokens: TokenStream, expect: impl ParseError + Debug)
-    where
+    pub(crate) fn assert_parse_fail<'d, T, E>(
+        mut tokens: TokenStream,
+        expect: impl Into<ParseError>,
+    ) where
         T: Parse,
         T::Output: Debug,
+        E: Into<ParseError>,
     {
         let result = tokens.with(T::parse);
         match result {
             Ok(v) => panic!("parsing succeded: {v:?}"),
-            Err(e) => assert_eq!(&*e, &expect),
+            Err(e) => assert_eq!(e, expect.into()),
         }
     }
 

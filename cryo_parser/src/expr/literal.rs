@@ -2,21 +2,20 @@
 //!
 //! Literal expressions are expressions that consist of literal tokens, i.e., they are direct and require no further computation when evaluated.
 
-use crate::{parse_error, parser::Parse};
+use crate::parser::Parse;
 use cryo_lexer::literal::{IntegerLiteral as IToken, StringLiteral as SToken};
 use cryo_parser_proc_macro::Parse;
 use cryo_span::Spanned;
+use derive_more::From;
 use itertools::Itertools;
 
-parse_error! {
-    /// Errors returned when parsing literals.
-    #(group)
-    pub enum LiteralError {
-        /// An error that may occur when parsing a string literal.
-        StringLiteralError(StringLiteralError),
-        /// An error that may occur when parsing an integer literal.
-        IntegerLiteralError(IntegerLiteralError),
-    }
+/// Errors returned when parsing literals.
+#[derive(From)]
+pub enum LiteralError {
+    /// An error that may occur when parsing a string literal.
+    StringLiteralError(StringLiteralError),
+    /// An error that may occur when parsing an integer literal.
+    IntegerLiteralError(IntegerLiteralError),
 }
 
 /// A literal expression.
@@ -36,14 +35,10 @@ pub enum Literal {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IntegerLiteral(pub i32);
 
-parse_error! {
-    /// Errors that may occur when parsing integer literals.
-    #(concrete, "integer parse literal error", 1)
-    pub enum IntegerLiteralError {
-        /// The given input would overflow if evaluated, since this type is constrained.
-        #(0, "integer overflow",)
-        Overflow,
-    }
+/// Errors that may occur when parsing integer literals.s
+pub enum IntegerLiteralError {
+    /// The given input would overflow if evaluated, since this type is constrained.
+    Overflow,
 }
 
 impl Parse for IntegerLiteral {
@@ -80,14 +75,10 @@ impl Parse for IntegerLiteral {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StringLiteral(pub String);
 
-parse_error! {
-    /// Errors that may occur when parsing a string literal.
-    #(concrete, "string literal parse error", 2)
-    pub enum StringLiteralError {
-        /// An invalid escape character was encountered.
-        #(0, "invalid escape {c}",)
-        InvalidEscape(c: char),
-    }
+/// Errors that may occur when parsing a string literal.
+pub enum StringLiteralError {
+    /// An invalid escape character was encountered.
+    InvalidEscape(char),
 }
 
 impl Parse for StringLiteral {

@@ -2,6 +2,7 @@
 //!
 //! A span declares a range inside a file.
 
+use std::sync::OnceLock;
 use std::{
     fmt::{Display, Formatter},
     ops::{Add, AddAssign, Deref, DerefMut},
@@ -16,6 +17,23 @@ mod tests;
 
 #[cfg(test)]
 pub use tests::TempFile;
+
+static MAP: OnceLock<SourceMap> = OnceLock::new();
+
+/// Initialise the library source map with a given value.
+///
+/// Once it has been initialised, the value cannot be mutated.
+///
+/// This must be run before any library functions or methods are used which use the source map. When `cfg(test)` is enabled however, the library will use a default (empty) source map unless otherwise specified with this function.
+pub fn initialize(map: SourceMap) -> Result<(), SourceMap> {
+    MAP.set(map)
+}
+
+#[track_caller]
+#[inline]
+fn source_map() -> &'static SourceMap {
+    MAP.get().expect("source map should be initialised")
+}
 
 /// A span.
 ///
@@ -65,24 +83,6 @@ impl Span {
 
         self
     }
-
-    /// Obtain an interface which can display [`Span`]s.
-    #[allow(private_interfaces)]
-    pub const fn display<'span, 'map>(
-        &'span self,
-        map: &'map SourceMap,
-    ) -> SpanDisplay<'span, 'map> {
-        SpanDisplay(self, map)
-    }
-}
-
-impl<T, const N: usize> From<[Spanned<T>; N]> for Spanned<[T; N]> {
-    fn from(value: [Spanned<T>; N]) -> Self {
-        let span = value.iter().fold(Span::ZERO, |a, b| a + b.span);
-        let items = value.map(|s| s.t);
-
-        Spanned { t: items, span }
-    }
 }
 
 impl Add for Span {
@@ -101,28 +101,25 @@ impl AddAssign for Span {
     }
 }
 
-/// Provides an interface which implements [`Display`].
-pub struct SpanDisplay<'span, 'map>(&'span Span, &'map SourceMap);
-
-impl Display for SpanDisplay<'_, '_> {
+impl Display for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Some(file) = self.1.get(self.0.file) else {
+        let Some(file) = source_map().get(self.file) else {
             return write!(
                 f,
                 "unable to find source file with index {}",
-                self.0.file.index()
+                self.file.index()
             );
         };
 
         let path = &file.file;
         let (Some((start_line, start_col)), Some((end_line, end_col))) =
-            (file.line_col(self.0.start), file.line_col(self.0.stop))
+            (file.line_col(self.start), file.line_col(self.stop))
         else {
-            return write!(f, "could not format span {:?}", self.0);
+            return write!(f, "could not format span {self:?}");
         };
 
-        let Ok(source) = file.resolve_source(self.0.start, self.0.stop) else {
-            return write!(f, "could not resolve source of span {:?}", self.0);
+        let Ok(source) = file.resolve_source(self.start, self.stop) else {
+            return write!(f, "could not resolve source of span {self:?}");
         };
 
         write!(
@@ -141,7 +138,7 @@ impl Display for SpanDisplay<'_, '_> {
 /// A spanned generic.
 ///
 /// This struct is simply the generic and a [`Span`].
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Spanned<T> {
     /// The given type.
     pub t: T,
@@ -183,17 +180,9 @@ impl<T> Spanned<T> {
     }
 
     /// Reinterpret this `Spanned<T>` as a `(T, Span)`.
+    #[inline]
     pub fn tuple(self) -> (T, Span) {
         (self.t, self.span)
-    }
-
-    /// Obtain an interface which implements [`Display`].
-    #[allow(private_interfaces)]
-    pub const fn display<'span, 'map>(
-        &'span self,
-        map: &'map SourceMap,
-    ) -> SpannedDisplay<'span, 'map, T> {
-        SpannedDisplay(self, map)
     }
 }
 
@@ -211,11 +200,8 @@ impl<T> DerefMut for Spanned<T> {
     }
 }
 
-/// Provides access to a display implementation for `Spanned<T>`.
-pub struct SpannedDisplay<'span, 'map, T>(&'span Spanned<T>, &'map SourceMap);
-
-impl<T: Display> Display for SpannedDisplay<'_, '_, T> {
+impl<T: Display> Display for Spanned<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} @ {}", self.0.t, self.0.span.display(self.1))
+        write!(f, "{} @ {}", self.t, self.span)
     }
 }
