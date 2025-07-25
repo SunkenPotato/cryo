@@ -2,7 +2,8 @@
 //!
 //! A lexer will take an input and split the input into [`Token`]s comprehensible by the parser without modifying the inputs.
 
-#![feature(array_try_map)]
+#![feature(array_try_from_fn)]
+#![feature(result_flattening)]
 
 macro_rules! token_marker {
     (
@@ -77,8 +78,8 @@ macro_rules! atom {
             fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
                 let rest = s
                     .strip_prefix($atom)
-                    .ok_or($crate::Error::new($crate::LexicalError::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len())))?;
-                Ok(($crate::Token::new($crate::TokenType::$identifier(Self), cryo_span::Span::new(0, $atom.len())), rest))
+                    .ok_or($crate::Error::new($crate::LexicalError::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len() as u32)))?;
+                Ok(($crate::Token::new($crate::TokenType::$identifier(Self), cryo_span::Span::new(0, $atom.len() as u32)), rest))
             }
         }
 
@@ -96,7 +97,7 @@ macro_rules! atom {
                     Ok((
                         $crate::Token::new(
                             $crate::TokenType::$identifier($identifier),
-                            cryo_span::Span::new(0, $atom.len())
+                            cryo_span::Span::new(0, $atom.len() as u32)
                         ),
                         ""
                     ))
@@ -146,12 +147,12 @@ macro_rules! atom {
                 for variant in Self::VARIANTS {
                     let atom = variant.as_str();
                     if let Some(v) = s.strip_prefix(variant.as_str()) {
-                        return Ok(($crate::Token::new($constructor(*variant), cryo_span::Span::new(0, atom.len())), v))
+                        return Ok(($crate::Token::new($constructor(*variant), cryo_span::Span::new(0, atom.len() as u32)), v))
                     }
                 }
 
-                let whitespace_pos = s.find(|c: char| c.is_whitespace()).unwrap_or(s.len());
-                Err($crate::Error::new($crate::LexicalError::SequenceNotFound(stringify!($identifier)), cryo_span::Span::new(0, whitespace_pos)))
+                let (start, _) = $crate::find_token_end(s);
+                Err($crate::Error::new($crate::LexicalError::SequenceNotFound(stringify!($identifier)), cryo_span::Span::new(0, start.len() as u32)))
             }
         }
 
@@ -173,7 +174,7 @@ macro_rules! atom {
                                     $constructor(
                                         super::$identifier::$variant
                                     ),
-                                    cryo_span::Span::new(0, super::$identifier::$variant.as_str().len())
+                                    cryo_span::Span::new(0, super::$identifier::$variant.as_str().len() as u32)
                                 ),
                                 ""
                             ))
@@ -238,6 +239,7 @@ trait Lex: Sized {
 }
 
 /// The possible types a token may be. `'source` refers to the lifetime of the input given to the parser.
+// TODO: overflow subtypes into this to avoid nesting
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType<'source> {
     /// A keyword.
@@ -305,7 +307,10 @@ impl Lex for TokenType<'_> {
                 return Ok(v);
             }
         }
-        Err(Error::new(LexicalError::NoMatch, Span::new(0, s.len())))
+        Err(Error::new(
+            LexicalError::NoMatch,
+            Span::new(0, s.len() as u32),
+        ))
     }
 }
 
@@ -349,7 +354,7 @@ pub fn lexer(input: &str) -> Result<TokenStream, Error> {
         let (mut token, rest) = TokenType::lex(loop_input)?;
 
         let token_len = loop_input.len() - rest.len();
-        token = token.offset(cursor);
+        token = token.offset(cursor as u32);
 
         tokens.push(token);
         cursor += token_len;
@@ -360,6 +365,14 @@ pub fn lexer(input: &str) -> Result<TokenStream, Error> {
     }
 
     Ok(TokenStream::new(tokens))
+}
+
+impl<'a> TryInto<TokenStream<'a>> for &'a str {
+    type Error = Error;
+
+    fn try_into(self) -> Result<TokenStream<'a>, Self::Error> {
+        lexer(self)
+    }
 }
 
 #[cfg(test)]
@@ -394,6 +407,6 @@ mod tests {
             Token::new(TokenType::Semi(Semi), Span::new(24, 25)),
         ];
 
-        assert_eq!(lexer(input).unwrap().inner, expected)
+        assert_eq!(&*lexer(input).unwrap().inner, expected)
     }
 }

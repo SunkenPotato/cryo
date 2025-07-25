@@ -26,7 +26,7 @@ impl Lex for Identifier<'_> {
     fn lex(s: &str) -> Result<(crate::Token, &str), crate::Error> {
         let (token, rest) = split_at_ident_end(s);
 
-        let span = Span::new(0, token.len());
+        let span = Span::new(0, token.len() as u32);
         let ('a'..='z' | 'A'..='Z' | '_') = token
             .chars()
             .next()

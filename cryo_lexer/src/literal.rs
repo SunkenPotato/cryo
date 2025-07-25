@@ -32,10 +32,10 @@ impl<'source> Lex for Literal<'source> {
             return IntegerLiteral::lex(s);
         }
 
-        let whitespace_pos = s.find(|c: char| c.is_whitespace()).unwrap_or(s.len());
+        let (start, _) = find_token_end(s);
         Err(Error::new(
             LexicalError::NoMatch,
-            Span::new(0, whitespace_pos),
+            Span::new(0, start.len() as u32),
         ))
     }
 }
@@ -64,7 +64,7 @@ impl Sealed for StringLiteral<'_> {}
 impl Lex for StringLiteral<'_> {
     fn lex(s: &str) -> Result<(crate::Token, &str), crate::Error> {
         let (token, rest) = find_token_end(s);
-        let span = Span::new(0, token.len());
+        let span = Span::new(0, token.len() as u32);
         let unquoted = match token.chars().next() {
             Some('"') => &s[1..],
             Some(_) => return Err(Error::new(LexicalError::SequenceNotFound("\""), span)),
@@ -140,14 +140,14 @@ impl Lex for IntegerLiteral<'_> {
         if int.starts_with('_') || int.ends_with('_') {
             return Err(Error::new(
                 LexicalError::InvalidSequence,
-                Span::new(0, total_len),
+                Span::new(0, total_len as u32),
             ));
         }
 
         Ok((
             Token::new(
                 TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(&s[..total_len]))),
-                Span::new(0, total_len),
+                Span::new(0, total_len as u32),
             ),
             rest,
         ))
@@ -185,7 +185,7 @@ impl Lex for BooleanLiteral {
         } else {
             Err(Error::new(
                 LexicalError::SequenceNotFound("true | false"),
-                Span::new(0, token.len()),
+                Span::new(0, token.len() as u32),
             ))
         }
     }

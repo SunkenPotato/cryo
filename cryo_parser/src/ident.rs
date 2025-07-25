@@ -1,5 +1,6 @@
 //! Identifiers.
 use cryo_lexer::identifier::Identifier;
+use cryo_span::Spanned;
 use internment::Intern;
 
 use crate::parser::Parse;
@@ -16,7 +17,7 @@ impl Parse for Ident {
     ) -> crate::parser::ParseResult<Self::Output> {
         tokens
             .advance_require::<Identifier>()
-            .map(|v| v.map(|v| Self(Intern::from(v.0))))
-            .map_err(Into::into)
+            .map_err(Spanned::cvt)
+            .map(|v| v.map(|v| Ident(Intern::from(v.0))))
     }
 }

@@ -1,59 +1,16 @@
-//! Expressions.
-//!
-//! Expressions are components of programming languages that, when evaluated, return a value.
+use cryo_lexer::stream::StreamLike;
 
-pub mod binary_expr;
-pub mod block;
-pub mod cond_expr;
-pub mod fn_call;
+use crate::{Parse, expr::literal::Literal};
+
 pub mod literal;
-pub mod struct_expr;
 
-#[cfg(test)]
-mod tests;
-
-use cryo_parser_proc_macro::Parse;
-
-use crate::{
-    expr::{
-        binary_expr::BinaryExpr, block::Block, cond_expr::IfExpr, literal::Literal,
-        struct_expr::StructExpr,
-    },
-    ident::Ident,
-    parser::Parse,
-};
-
-/// An expression.
-// derive(Parse) cannot be applied to this to prevent double ReducedExpr parsing
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Expr {
-    /// A base expression.
-    BaseExpr(BaseExpr),
-    /// A binary expression.
-    BinaryExpr(BinaryExpr),
+    Lit(Literal),
 }
 
 impl Parse for Expr {
-    type Output = Self;
-    #[expect(unused)]
-    fn parse(
-        tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-    ) -> crate::parser::ParseResult<Self::Output> {
-        todo!()
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        tokens.with(Literal::parse).map(Self::Lit)
     }
-}
-
-/// Expressions excluding `MathExpr`.
-#[derive(Parse, Debug, PartialEq)]
-pub enum BaseExpr {
-    /// A literal expression.
-    Literal(Literal),
-    /// A binding reference.
-    BindingRef(Ident),
-    /// A block expression.
-    Block(Block),
-    /// A conditional expression.
-    IfExpr(IfExpr),
-    /// A struct constructor expression.
-    StructExpr(StructExpr),
 }

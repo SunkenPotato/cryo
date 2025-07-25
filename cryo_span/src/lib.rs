@@ -2,42 +2,11 @@
 //!
 //! A span declares a range inside a file.
 
-use std::sync::OnceLock;
-use std::{
-    fmt::{Display, Formatter},
-    ops::{Add, AddAssign, Deref, DerefMut},
-};
-
-use crate::source_map::{SourceIndex, SourceMap};
-
-pub mod source_map;
-
-#[cfg(test)]
-mod tests;
-
-#[cfg(test)]
-pub use tests::TempFile;
-
-static MAP: OnceLock<SourceMap> = OnceLock::new();
-
-/// Initialise the library source map with a given value.
-///
-/// Once it has been initialised, the value cannot be mutated.
-///
-/// This must be run before any library functions or methods are used which use the source map. When `cfg(test)` is enabled however, the library will use a default (empty) source map unless otherwise specified with this function.
-pub fn initialize(map: SourceMap) -> Result<(), SourceMap> {
-    MAP.set(map)
-}
-
-#[track_caller]
-#[inline]
-fn source_map() -> &'static SourceMap {
-    MAP.get().expect("source map should be initialised")
-}
+use std::ops::{Add, AddAssign, Deref, DerefMut};
 
 /// A span.
 ///
-/// A span contains the start, the stop, and the file of the section it refers to. It acts similar to a range.
+/// A span contains the start and the stop of the section it refers to. It acts similar to a range.
 ///
 /// ## Examples
 /// ```rust
@@ -47,12 +16,10 @@ fn source_map() -> &'static SourceMap {
 /// ```
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Span {
-    /// The lower bound of this [`Span].
-    pub start: usize,
+    /// The lower bound of this [`Span`].
+    pub start: u32,
     /// The upper bound of this [`Span`].
-    pub stop: usize,
-    /// The index of the file in the global [`SourceMap`].
-    pub file: SourceIndex,
+    pub stop: u32,
 }
 
 impl Span {
@@ -64,20 +31,12 @@ impl Span {
     /// If `start < stop`, this function will panic.
     #[inline]
     #[track_caller]
-    pub const fn new(start: usize, stop: usize) -> Self {
-        Self::new_file(start, stop, SourceIndex::from_raw_unchecked(0))
-    }
-
-    #[inline]
-    #[track_caller]
-    /// Create a new span from a start, a stop, and a file index to the [`SourceMap`].
-    pub const fn new_file(start: usize, stop: usize, file: SourceIndex) -> Self {
-        assert!(stop >= start);
-        Self { start, stop, file }
+    pub const fn new(start: u32, stop: u32) -> Self {
+        Self { start, stop }
     }
 
     /// Offset the `start` and `stop` of the [`Span`] by `offset`.
-    pub const fn offset(mut self, offset: usize) -> Self {
+    pub const fn offset(mut self, offset: u32) -> Self {
         self.start += offset;
         self.stop += offset;
 
@@ -101,40 +60,6 @@ impl AddAssign for Span {
     }
 }
 
-impl Display for Span {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Some(file) = source_map().get(self.file) else {
-            return write!(
-                f,
-                "unable to find source file with index {}",
-                self.file.index()
-            );
-        };
-
-        let path = &file.file;
-        let (Some((start_line, start_col)), Some((end_line, end_col))) =
-            (file.line_col(self.start), file.line_col(self.stop))
-        else {
-            return write!(f, "could not format span {self:?}");
-        };
-
-        let Ok(source) = file.resolve_source(self.start, self.stop) else {
-            return write!(f, "could not resolve source of span {self:?}");
-        };
-
-        write!(
-            f,
-            "{}:{start_line}:{start_col} - {end_line}:{end_col}:",
-            path.display()
-        )?;
-        for (idx, line) in source.lines().enumerate() {
-            write!(f, "\n\t{} | {line}", idx + start_line)?;
-        }
-
-        Ok(())
-    }
-}
-
 /// A spanned generic.
 ///
 /// This struct is simply the generic and a [`Span`].
@@ -148,8 +73,15 @@ pub struct Spanned<T> {
 
 impl<T> Spanned<T> {
     /// Create a new [`Spanned`] from `T` and a [`Span`].
+    #[inline]
     pub const fn new(t: T, span: Span) -> Self {
         Self { t, span }
+    }
+
+    /// Create a new [`Spanned`] from a value and the span [`Span::ZERO`].
+    #[inline]
+    pub const fn zero(t: T) -> Self {
+        Self::new(t, Span::ZERO)
     }
 
     /// Map a `Spanned<T>` to a `Spanned<U>` via a given function.
@@ -174,7 +106,7 @@ impl<T> Spanned<T> {
     /// Offset the inner [`Span`] by `offset`.
     ///
     /// This method is equivalent to calling [`Span::offset`] on the inner span.
-    pub const fn offset(mut self, offset: usize) -> Self {
+    pub const fn offset(mut self, offset: u32) -> Self {
         self.span = self.span.offset(offset);
         self
     }
@@ -183,6 +115,26 @@ impl<T> Spanned<T> {
     #[inline]
     pub fn tuple(self) -> (T, Span) {
         (self.t, self.span)
+    }
+
+    /// Equivalent to `self.map(From::from)`.
+    #[inline]
+    pub fn cvt<U>(self) -> Spanned<U>
+    where
+        U: From<T>,
+    {
+        self.map(From::from)
+    }
+
+    /// Try to convert a `Spanned<T>` into a `Spanned<U>` via `TryInto<U>`.
+    pub fn try_cvt<U>(self) -> Result<Spanned<U>, <T as TryInto<U>>::Error>
+    where
+        T: TryInto<U>,
+    {
+        Ok(Spanned {
+            t: self.t.try_into()?,
+            span: self.span,
+        })
     }
 }
 
@@ -197,11 +149,5 @@ impl<T> Deref for Spanned<T> {
 impl<T> DerefMut for Spanned<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.t
-    }
-}
-
-impl<T: Display> Display for Spanned<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} @ {}", self.t, self.span)
     }
 }

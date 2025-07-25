@@ -21,15 +21,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 
 [[package]]
-name = "cryo_extension_trait"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "cryo_lexer"
 version = "0.1.0"
 dependencies = [
@@ -46,6 +37,7 @@ dependencies = [
  "cryo_parser_proc_macro",
  "cryo_span",
  "derive_more",
+ "extension-traits",
  "internment",
  "itertools",
  "paste",
@@ -58,7 +50,7 @@ dependencies = [
  "derive_more",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -87,7 +79,7 @@ checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
  "unicode-xid",
 ]
 
@@ -102,6 +94,35 @@ name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
+
+[[package]]
+name = "ext-trait"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "703090345f7d5de48379b391c9dfe69967a3c1694730a3e53bf4c905f71069c0"
+dependencies = [
+ "ext-trait-proc_macros",
+]
+
+[[package]]
+name = "ext-trait-proc_macros"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd9f3f15f123dee4e8a6b14f033ba22904a48c5935505dc07225ce440e640d8b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "extension-traits"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "360cbc11ebc403c8ebb731dfb4d3950835d40d3d9a20f0e89a27b17e991d0863"
+dependencies = [
+ "ext-trait",
+]
 
 [[package]]
 name = "foldhash"
@@ -247,6 +268,17 @@ dependencies = [
 
 [[package]]
 name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
 version = "2.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17b6f705963418cdb9927482fa304bc562ece2fdd4f616084c50b7023b435a40"
@@ -303,5 +335,5 @@ checksum = "9ecf5b4cc5364572d7f4c329661bcc82724222973f2cab6f050a4e5c22f75181"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.104",
 ]

@@ -2,136 +2,77 @@
 //!
 //! Atoms are components of code that are constant and only can be parsed from one specific atom token.
 
-use crate::parser::Parse;
 use cryo_lexer::{
+    FromToken,
     atoms::{
         Assign as AToken, Colon as ColToken, Comma as CToken, Dot as DToken, Keyword,
         LCurly as LCToken, LParen as LPToken, RCurly as RCToken, RParen as RPToken, Semi as SToken,
     },
-    stream::TokenStreamError,
+    stream::Guard,
 };
-use cryo_span::Spanned;
+
+struct Assert<const COND: bool>;
+
+#[diagnostic::on_unimplemented(
+    message = "it is undefined behaviour to pass a type to this function which is not a zero-sized type."
+)]
+trait True {}
+
+impl True for Assert<true> {}
+
+pub fn atom<S, T>(tokens: &mut Guard) -> Option<S>
+where
+    for<'s> T: FromToken<'s>,
+    Assert<{ size_of::<T>() == 0 }>: True,
+    Assert<{ size_of::<S>() == 0 }>: True,
+{
+    tokens.advance_require::<T>().ok()?;
+
+    // SAFETY: we have checked the size of S and T with the constant generic expressions guaranteeing that they are ZSTs and therefore, zero patterns are valid for them.
+    unsafe { Some(::core::mem::zeroed()) }
+}
 
 macro_rules! atom {
-    ($(#[doc = $doc:literal])* $out:ident, $token:ident) => {
-        $(#[doc = $doc])*
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        pub struct $out;
+    ($name:ident, $from:ident) => {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub struct $name;
 
-        impl Parse for $out {
-            type Output = Self;
-
-            fn parse(
-                tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-            ) -> crate::parser::ParseResult<Self::Output> {
-                tokens
-                    .advance_require::<$token>()
-                    .map(|v| v.map(|_| Self))
-                    .map_err(Into::into)
+        impl $name {
+            pub fn parse(tokens: &mut Guard) -> Option<Self> {
+                atom::<Self, $from>(tokens)
             }
         }
     };
 
-    ($(#[doc = $doc:literal])* $out:ident, $token:ident::$variant:ident) => {
-        $(#[doc = $doc])*
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        pub struct $out;
+    ($name:ident, $e:ident::$var:ident) => {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub struct $name;
 
-        impl Parse for $out {
-            type Output = Self;
-
-            fn parse(
-                tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-            ) -> crate::parser::ParseResult<Self::Output> {
-                match tokens.advance_require::<$token>() {
-                    Ok(
-                        s @ Spanned {
-                            t: $token::$variant,
-                            ..
-                        },
-                    ) => Ok(s.map(|_| Self)),
-                    Ok(Spanned { span, .. }) => Err(Box::new(TokenStreamError::IncorrectToken(
-                        stringify!($token::$variant),
-                        span,
-                    ))),
-                    Err(e) => Err(Box::new(e)),
+        impl $name {
+            pub fn parse(tokens: &mut Guard) -> Option<Self> {
+                if let $e::$var = **tokens.advance_require::<$e>().ok()? {
+                    return Some(Self);
+                } else {
+                    return None;
                 }
             }
         }
     };
 }
 
-atom!(
-    /// A semicolon (`;`).
-    Semi, SToken
-);
+atom!(Assign, AToken);
+atom!(Colon, ColToken);
+atom!(Comma, CToken);
+atom!(Dot, DToken);
+atom!(LCurly, LCToken);
+atom!(RCurly, RCToken);
+atom!(LParen, LPToken);
+atom!(RParen, RPToken);
+atom!(Semi, SToken);
 
-atom!(
-    /// `=`.
-    Assign, AToken
-);
-
-atom!(
-    /// A left curly brace (`{`).
-    LCurly, LCToken
-);
-
-atom!(
-    /// A right curly brace (`}`).
-    RCurly, RCToken
-);
-
-atom!(
-    /// The `let` keyword.
-    Let, Keyword::Let
-);
-
-atom!(
-    /// The `mut` keyword.
-    Mut, Keyword::Mut
-);
-
-atom!(
-    /// The `if` keyword.
-    If, Keyword::If
-);
-
-atom!(
-    /// The `else` keyword.
-    Else, Keyword::Else
-);
-
-atom!(
-    /// A comma.
-    Comma, CToken
-);
-
-atom!(
-    /// A colon.
-    Colon, ColToken
-);
-
-atom!(
-    /// A left parenthesis.
-    LParen, LPToken
-);
-
-atom!(
-    /// A right parenthesis.
-    RParen, RPToken
-);
-
-atom!(
-    /// The struct keyword.
-    Struct, Keyword::Struct
-);
-
-atom!(
-    /// The `fun` keyword.
-    Fun, Keyword::Fun
-);
-
-atom!(
-    /// A dot.
-    Dot, DToken
-);
+atom!(Let, Keyword::Let);
+atom!(Mut, Keyword::Mut);
+atom!(If, Keyword::If);
+atom!(Else, Keyword::Else);
+atom!(Fun, Keyword::Fun);
+atom!(Struct, Keyword::Struct);
