@@ -7,9 +7,11 @@
 
 pub mod atoms;
 pub mod expr;
+pub mod ident;
+
 #[cfg(test)]
 mod test_util;
-// pub mod ident;
+
 use cryo_lexer::stream::{Guard, StreamLike, TokenStream, TokenStreamError};
 use cryo_span::{Span, Spanned};
 use derive_more::From;
