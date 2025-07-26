@@ -313,6 +313,7 @@ mod tests {
     use crate::{
         Token, TokenType,
         atoms::{Equal, Semi},
+        identifier::Identifier,
         stream::{StreamLike, TokenStream, TokenStreamError},
     };
 
@@ -322,7 +323,7 @@ mod tests {
         let mut stream = TokenStream::new(vec![
             Token::new(TokenType::Equal(Equal), Span::ZERO),
             Token::new(TokenType::Semi(Semi), Span::ZERO),
-            Token::new(TokenType::Keyword(crate::atoms::Keyword::Let), Span::ZERO),
+            Token::new(TokenType::Identifier(Identifier("let")), Span::ZERO),
         ]);
 
         stream.with(|guard| {
@@ -339,7 +340,7 @@ mod tests {
             assert_eq!(
                 guard.advance(),
                 Ok(&Token::new(
-                    TokenType::Keyword(crate::atoms::Keyword::Let),
+                    TokenType::Identifier(Identifier("let")),
                     Span::ZERO
                 ))
             );

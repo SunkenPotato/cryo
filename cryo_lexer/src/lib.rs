@@ -35,8 +35,8 @@ use cryo_span::{Span, Spanned};
 
 use crate::{
     atoms::{
-        Bang, Colon, Comma, Dot, Equal, Keyword, LCurly, LParen, Minus, Percent, Plus, RCurly,
-        RParen, Semi, Slash, Star,
+        Bang, Colon, Comma, Dot, Equal, LCurly, LParen, Minus, Percent, Plus, RCurly, RParen, Semi,
+        Slash, Star,
     },
     identifier::Identifier,
     literal::Literal,
@@ -99,9 +99,6 @@ trait Lex: Sized {
 // TODO: overflow subtypes into this to avoid nesting
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType<'source> {
-    /// A keyword.
-    Keyword(Keyword),
-
     /// An identifier.
     Identifier(Identifier<'source>),
 
@@ -168,7 +165,6 @@ pub trait FromToken<'source>: Sealed {
 impl<'s> TokenType<'s> {
     // the order of these is important
     const LEX_FUNCTIONS: &'static [LexFn] = &[
-        Keyword::lex,
         Identifier::lex,
         Literal::lex,
         Plus::lex,
@@ -270,7 +266,7 @@ mod tests {
 
     use crate::{
         Token, TokenType,
-        atoms::{Equal, Keyword, Semi},
+        atoms::{Equal, Semi},
         identifier::Identifier,
         lexer,
         literal::{IntegerLiteral, Literal, StringLiteral},
@@ -281,7 +277,7 @@ mod tests {
         let input = "let input = 20 + \"hello\";";
 
         let expected = [
-            Token::new(TokenType::Keyword(Keyword::Let), Span::new(0, 3)),
+            Token::new(TokenType::Identifier(Identifier("let")), Span::new(0, 3)),
             Token::new(TokenType::Identifier(Identifier("input")), Span::new(4, 9)),
             Token::new(TokenType::Equal(Equal), Span::new(10, 11)),
             Token::new(
