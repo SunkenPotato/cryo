@@ -11,5 +11,5 @@ paste = "*"
 
 [dependencies]
 cryo_span = { version = "0.1.0", path = "../cryo_span" }
+internment = "0.8.6"
 sealed_trait = "0.1.1"
-smallvec = "1.15.1"

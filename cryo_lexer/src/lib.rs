@@ -6,17 +6,17 @@
 
 macro_rules! token_marker {
     (
-        $type:ident $(<$lt:tt>)?
+        $type:ident
     ) => {
-        impl<'source> $crate::Sealed for $type $(<$lt>)? {}
+        impl $crate::Sealed for $type {}
 
-        impl<'source> $crate::FromToken<'source> for $type $(<$lt>)? {
+        impl $crate::TokenLike for $type {
             const NAME: &'static str = stringify!($type);
-            fn from_token<'borrow>(
-                token: &'borrow $crate::Token<'source>,
-            ) -> Option<::cryo_span::Spanned<&'borrow Self>> {
+            fn from_token(token: &$crate::Token) -> Option<::cryo_span::Spanned<&Self>> {
                 match token.t {
-                    $crate::TokenType::$type(ref v) => Some(::cryo_span::Spanned::new(v, token.span)),
+                    $crate::TokenType::$type(ref v) => {
+                        Some(::cryo_span::Spanned::new(v, token.span))
+                    }
                     _ => None,
                 }
             }
@@ -29,9 +29,10 @@ pub mod identifier;
 pub mod literal;
 pub mod stream;
 
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref};
 
 use cryo_span::{Span, Spanned};
+use internment::Intern;
 
 use crate::{
     atoms::{
@@ -44,26 +45,46 @@ use crate::{
 };
 
 /// A token. Contains a [`Span`] and a [`TokenType`].
-pub type Token<'source> = Spanned<TokenType<'source>>;
+pub type Token = Spanned<TokenType>;
 
 /// Extension trait for `Spanned<TokenType>` (a.k.a., [`Token`]).
-pub trait TokenExt<'source> {
+pub trait TokenExt {
     /// Attempt to reinterpret `self` as `T` using [`FromToken`].
-    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>>;
+    fn require<T: TokenLike>(&self) -> Option<Spanned<&T>>;
     /// Checks whether `self` can be reinterpreted as `T`.
-    fn is<T: FromToken<'source>>(&self) -> bool {
+    fn is<T: TokenLike>(&self) -> bool {
         self.require::<T>().is_some()
     }
 }
 
-impl<'source> TokenExt<'source> for Token<'source> {
-    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>> {
+impl TokenExt for Token {
+    fn require<T: TokenLike>(&self) -> Option<Spanned<&T>> {
         T::from_token(self)
     }
 }
 
 type LexFn = fn(&str) -> Result<(Token, &str), Error>;
 type Error = Spanned<LexicalError>;
+
+/// A symbol.
+///
+/// A symbol represents an interned slice of input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct Symbol(pub Intern<str>);
+
+impl Deref for Symbol {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<&str> for Symbol {
+    fn from(value: &str) -> Self {
+        Self(Intern::from(value))
+    }
+}
 
 /// Split an input string while the supplied function returns `false`.
 pub fn extract(s: &str, f: impl Fn(char) -> bool) -> (&str, &str) {
@@ -98,12 +119,12 @@ trait Lex: Sized {
 /// The possible types a token may be. `'source` refers to the lifetime of the input given to the parser.
 // TODO: overflow subtypes into this to avoid nesting
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TokenType<'source> {
+pub enum TokenType {
     /// An identifier.
-    Identifier(Identifier<'source>),
+    Identifier(Identifier),
 
     /// A literal.
-    Literal(Literal<'source>),
+    Literal(Literal),
 
     /// A semicolon (`;`).
     Semi(Semi),
@@ -155,16 +176,16 @@ trait Sealed {}
 
 /// Trait for attempting to convert `Token`s into concrete types.
 #[allow(private_bounds)]
-pub trait FromToken<'source>: Sealed {
+pub trait TokenLike: Sealed {
     /// The name of the token.
     const NAME: &'static str;
     /// Attempt to convert a given token into `Self`.
-    fn from_token<'borrow>(token: &'borrow Token<'source>) -> Option<Spanned<&'borrow Self>>;
+    fn from_token(token: &Token) -> Option<Spanned<&Self>>;
 }
 
-impl<'s> TokenType<'s> {
+impl TokenType {
     // the order of these is important
-    const LEX_FUNCTIONS: &'static [LexFn] = &[
+    const LEX_FUNCTIONS: &[LexFn] = &[
         Identifier::lex,
         Literal::lex,
         Plus::lex,
@@ -185,7 +206,7 @@ impl<'s> TokenType<'s> {
     ];
 }
 
-impl Lex for TokenType<'_> {
+impl Lex for TokenType {
     fn lex(s: &str) -> Result<(Token, &str), Error> {
         for f in Self::LEX_FUNCTIONS {
             if let Ok(v) = f(s) {
@@ -252,10 +273,10 @@ pub fn lexer(input: &str) -> Result<TokenStream, Error> {
     Ok(TokenStream::new(tokens))
 }
 
-impl<'a> TryInto<TokenStream<'a>> for &'a str {
+impl TryInto<TokenStream> for &'_ str {
     type Error = Error;
 
-    fn try_into(self) -> Result<TokenStream<'a>, Self::Error> {
+    fn try_into(self) -> Result<TokenStream, Self::Error> {
         lexer(self)
     }
 }
@@ -277,16 +298,22 @@ mod tests {
         let input = "let input = 20 + \"hello\";";
 
         let expected = [
-            Token::new(TokenType::Identifier(Identifier("let")), Span::new(0, 3)),
-            Token::new(TokenType::Identifier(Identifier("input")), Span::new(4, 9)),
+            Token::new(
+                TokenType::Identifier(Identifier("let".into())),
+                Span::new(0, 3),
+            ),
+            Token::new(
+                TokenType::Identifier(Identifier("input".into())),
+                Span::new(4, 9),
+            ),
             Token::new(TokenType::Equal(Equal), Span::new(10, 11)),
             Token::new(
-                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral("20"))),
+                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral("20".into()))),
                 Span::new(12, 14),
             ),
             Token::new(TokenType::Plus(crate::atoms::Plus), Span::new(15, 16)),
             Token::new(
-                TokenType::Literal(Literal::StringLiteral(StringLiteral("hello"))),
+                TokenType::Literal(Literal::StringLiteral(StringLiteral("hello".into()))),
                 Span::new(17, 24),
             ),
             Token::new(TokenType::Semi(Semi), Span::new(24, 25)),

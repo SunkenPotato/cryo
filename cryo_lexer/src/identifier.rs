@@ -4,13 +4,13 @@
 
 use cryo_span::{Span, Spanned};
 
-use crate::{Error, FromToken, Lex, Sealed, Token, TokenType, extract};
+use crate::{Error, Lex, Sealed, Symbol, Token, TokenLike, TokenType, extract};
 
 /// An identifier.
 ///
 /// Identifiers are tokens used to identify bindings, functions, or structures. One may also view them as names.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
-pub struct Identifier<'source>(pub &'source str);
+pub struct Identifier(pub Symbol);
 
 fn split_at_ident_end(s: &str) -> (&str, &str) {
     extract(s, |c| {
@@ -22,7 +22,7 @@ fn is_invalid_ident_char(c: char) -> bool {
     !matches!(c, '0'..='9' | 'a'..='z' | 'A'..='Z' | '_')
 }
 
-impl Lex for Identifier<'_> {
+impl Lex for Identifier {
     fn lex(s: &str) -> Result<(crate::Token, &str), crate::Error> {
         let (token, rest) = split_at_ident_end(s);
 
@@ -40,15 +40,15 @@ impl Lex for Identifier<'_> {
         }
 
         Ok((
-            Token::new(TokenType::Identifier(Identifier(token)), span),
+            Token::new(TokenType::Identifier(Identifier(token.into())), span),
             rest,
         ))
     }
 }
 
-impl<'source> FromToken<'source> for Identifier<'source> {
+impl TokenLike for Identifier {
     const NAME: &'static str = "Identifier";
-    fn from_token<'borrow>(token: &'borrow Token<'source>) -> Option<Spanned<&'borrow Self>> {
+    fn from_token(token: &Token) -> Option<Spanned<&Self>> {
         match token.t {
             TokenType::Identifier(ref id) => Some(Spanned::new(id, token.span)),
             _ => None,
@@ -56,7 +56,7 @@ impl<'source> FromToken<'source> for Identifier<'source> {
     }
 }
 
-impl Sealed for Identifier<'_> {}
+impl Sealed for Identifier {}
 
 #[cfg(test)]
 mod tests {
@@ -70,7 +70,7 @@ mod tests {
             Identifier::lex("twenty_1"),
             Ok((
                 Token::new(
-                    TokenType::Identifier(Identifier("twenty_1")),
+                    TokenType::Identifier(Identifier("twenty_1".into())),
                     Span::new(0, 8)
                 ),
                 ""

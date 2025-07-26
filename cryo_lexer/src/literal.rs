@@ -5,23 +5,23 @@
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    Error, FromToken, Lex, LexicalError, Sealed, Token, TokenType, extract, find_token_end,
+    Error, Lex, LexicalError, Sealed, Symbol, Token, TokenLike, TokenType, extract, find_token_end,
 };
 
 /// A literal. View the module-level docs for more information.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Literal<'source> {
+pub enum Literal {
     /// A string literal.
-    StringLiteral(StringLiteral<'source>),
+    StringLiteral(StringLiteral),
     /// An integer literal.
-    IntegerLiteral(IntegerLiteral<'source>),
+    IntegerLiteral(IntegerLiteral),
     /// A boolean literal.
     BooleanLiteral(BooleanLiteral),
 }
 
-token_marker!(Literal<'source>);
+token_marker!(Literal);
 
-impl<'source> Lex for Literal<'source> {
+impl Lex for Literal {
     fn lex(s: &str) -> Result<(crate::Token, &str), Error> {
         let first = s.chars().next();
         if let Some('"') = first {
@@ -46,11 +46,11 @@ impl<'source> Lex for Literal<'source> {
 ///
 /// String literals are delimited by the token `"`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct StringLiteral<'source>(pub &'source str);
+pub struct StringLiteral(pub Symbol);
 
-impl<'s> FromToken<'s> for StringLiteral<'s> {
+impl TokenLike for StringLiteral {
     const NAME: &'static str = "StringLiteral";
-    fn from_token<'borrow>(token: &'borrow Token<'s>) -> Option<Spanned<&'borrow Self>> {
+    fn from_token(token: &Token) -> Option<Spanned<&Self>> {
         let lit = Literal::from_token(token)?;
         match lit.t {
             Literal::StringLiteral(s) => Some(Spanned::new(s, lit.span)),
@@ -59,9 +59,9 @@ impl<'s> FromToken<'s> for StringLiteral<'s> {
     }
 }
 
-impl Sealed for StringLiteral<'_> {}
+impl Sealed for StringLiteral {}
 
-impl Lex for StringLiteral<'_> {
+impl Lex for StringLiteral {
     fn lex(s: &str) -> Result<(crate::Token, &str), crate::Error> {
         let (token, rest) = find_token_end(s);
         let span = Span::new(0, token.len() as u32);
@@ -97,7 +97,9 @@ impl Lex for StringLiteral<'_> {
 
         Ok((
             Token::new(
-                TokenType::Literal(Literal::StringLiteral(StringLiteral(&unquoted[..cursor]))),
+                TokenType::Literal(Literal::StringLiteral(StringLiteral(
+                    unquoted[..cursor].into(),
+                ))),
                 span,
             ),
             rest,
@@ -112,11 +114,11 @@ impl Lex for StringLiteral<'_> {
 /// Integer literals may not begin or end with a separator and may not contain negation signs anywhere but in the front.
 /// A variable number of both negation signs and separators are supported where they are valid.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct IntegerLiteral<'source>(pub &'source str);
+pub struct IntegerLiteral(pub Symbol);
 
-impl<'s> FromToken<'s> for IntegerLiteral<'s> {
+impl TokenLike for IntegerLiteral {
     const NAME: &'static str = "IntegerLiteral";
-    fn from_token<'borrow>(token: &'borrow Token<'s>) -> Option<Spanned<&'borrow Self>> {
+    fn from_token(token: &Token) -> Option<Spanned<&Self>> {
         let lit = Literal::from_token(token)?;
         match lit.t {
             Literal::IntegerLiteral(s) => Some(Spanned::new(s, lit.span)),
@@ -125,13 +127,13 @@ impl<'s> FromToken<'s> for IntegerLiteral<'s> {
     }
 }
 
-impl Sealed for IntegerLiteral<'_> {}
+impl Sealed for IntegerLiteral {}
 
 fn is_invalid_integer_char(c: char) -> bool {
     !matches!(c, '0'..='9' | '_')
 }
 
-impl Lex for IntegerLiteral<'_> {
+impl Lex for IntegerLiteral {
     fn lex(s: &str) -> Result<(Token, &str), Error> {
         let (int, rest) = extract(s, is_invalid_integer_char);
 
@@ -144,7 +146,9 @@ impl Lex for IntegerLiteral<'_> {
 
         Ok((
             Token::new(
-                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(&s[..int.len()]))),
+                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(
+                    s[..int.len()].into(),
+                ))),
                 Span::new(0, int.len() as u32),
             ),
             rest,
@@ -206,7 +210,7 @@ mod tests {
             StringLiteral::lex(input),
             Ok((
                 Token::new(
-                    TokenType::Literal(Literal::StringLiteral(StringLiteral("hello"))),
+                    TokenType::Literal(Literal::StringLiteral(StringLiteral("hello".into()))),
                     Span::new(0, 7)
                 ),
                 ""
@@ -221,7 +225,9 @@ mod tests {
             StringLiteral::lex(input),
             Ok((
                 Token::new(
-                    TokenType::Literal(Literal::StringLiteral(StringLiteral("hello, world\\n"))),
+                    TokenType::Literal(Literal::StringLiteral(StringLiteral(
+                        "hello, world\\n".into()
+                    ))),
                     Span::new(0, 16)
                 ),
                 ""
@@ -249,7 +255,7 @@ mod tests {
             IntegerLiteral::lex(input),
             Ok((
                 Token::new(
-                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input))),
+                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input.into()))),
                     Span::new(0, 6)
                 ),
                 ""
@@ -264,7 +270,7 @@ mod tests {
             IntegerLiteral::lex(input),
             Ok((
                 Token::new(
-                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input))),
+                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input.into()))),
                     Span::new(0, 7)
                 ),
                 ""
