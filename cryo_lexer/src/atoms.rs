@@ -2,44 +2,182 @@
 //!
 //! Atoms are tokens which are constant and only may be parsed from one specific input.
 
-use crate::atom;
+#[doc(hidden)]
+macro_rules! atom {
+    (
+        $(#[$attr:meta])*
+        $identifier:ident  = $atom:expr
+    ) => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        $(#[$attr])*
+        pub struct $identifier;
+
+        impl $crate::Lex for $identifier {
+            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
+                let rest = s
+                    .strip_prefix($atom)
+                    .ok_or($crate::Error::new($crate::LexicalError::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len() as u32)))?;
+                Ok(($crate::Token::new($crate::TokenType::$identifier(Self), cryo_span::Span::new(0, $atom.len() as u32)), rest))
+            }
+        }
+
+        token_marker!($identifier);
+
+        #[cfg(test)]
+        ::paste::paste! {
+            #[test]
+            #[allow(non_snake_case)]
+            fn [<lex_ $identifier>]() {
+                use $crate::Lex;
+
+                assert_eq!(
+                    $identifier::lex($atom),
+                    Ok((
+                        $crate::Token::new(
+                            $crate::TokenType::$identifier($identifier),
+                            cryo_span::Span::new(0, $atom.len() as u32)
+                        ),
+                        ""
+                    ))
+                )
+            }
+        }
+    };
+
+
+    (
+        $(#[$attr:meta])*
+        $visibility:vis enum $identifier:ident {
+            $(
+                $(#[$variant_attr:meta])*
+                #($atom:expr)
+                $variant:ident
+            ),*
+        } with $constructor:path
+    ) => {
+        $(#[$attr])*
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        $visibility enum $identifier {
+            $(
+                $(#[$variant_attr])*
+                $variant,
+            )*
+        }
+
+        impl $identifier {
+            #[doc = concat!("The variants ", stringify!($identifier), " may have")]
+            $visibility const VARIANTS: &[Self] = &[$(
+                Self::$variant,
+            )*];
+
+            #[doc = concat!("Return the string this variant would be able to be parsed from")]
+            $visibility const fn as_str(&self) -> &str {
+                match self {
+                    $(
+                        Self::$variant => $atom,
+                    )*
+                }
+            }
+        }
+
+        impl $crate::Lex for $identifier {
+            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
+                for variant in Self::VARIANTS {
+                    let atom = variant.as_str();
+                    if let Some(v) = s.strip_prefix(variant.as_str()) {
+                        return Ok(($crate::Token::new($constructor(*variant), cryo_span::Span::new(0, atom.len() as u32)), v))
+                    }
+                }
+
+                let (start, _) = $crate::find_token_end(s);
+                Err($crate::Error::new($crate::LexicalError::SequenceNotFound(stringify!($identifier)), cryo_span::Span::new(0, start.len() as u32)))
+            }
+        }
+
+        token_marker!($identifier);
+
+        #[cfg(test)]
+        ::paste::paste! {
+            #[allow(non_snake_case)]
+            mod [<$identifier _tests>] {
+                use $crate::Lex;
+                $(
+                    #[test]
+                    #[allow(non_snake_case)]
+                    fn [<lex_ $identifier _ $variant>]() {
+                        assert_eq!(
+                            super::$identifier::lex(super::$identifier::$variant.as_str()),
+                            Ok((
+                                $crate::Token::new(
+                                    $constructor(
+                                        super::$identifier::$variant
+                                    ),
+                                    cryo_span::Span::new(0, super::$identifier::$variant.as_str().len() as u32)
+                                ),
+                                ""
+                            ))
+                        );
+                    }
+                )*
+            }
+        }
+    };
+
+    (
+        $(#[$attr:meta])*
+        $visibility:vis enum $identifier:ident {
+            $(
+                $(#[$variant_attr:meta])*
+                #($atom:expr)
+                $variant:ident
+            ),*
+        }
+    ) => {
+        atom!(
+            $(#[$attr])*
+            $visibility enum $identifier {
+                $(
+                    $(#[$variant_attr])*
+                    #($atom)
+                    $variant
+                ),*
+            } with $crate::TokenType::$identifier
+        );
+    };
+}
 
 atom!(
     /// The left curly parenthesis.
-    LCurly, "{"
+    LCurly = "{"
 );
 atom!(
     /// The right curly parenthesis.
-    RCurly, "}"
+    RCurly = "}"
 );
 atom!(
     /// The left parenthesis.
-    LParen, "("
+    LParen = "("
 );
 atom!(
     /// The right parenthesis.
-    RParen, ")"
+    RParen = ")"
 );
 atom!(
     /// A semicolon.
-    Semi, ";"
-);
-atom!(
-    /// The assign token.
-    Assign, "="
+    Semi = ";"
 );
 atom!(
     /// A comma.
-    Comma, ","
+    Comma = ","
 );
 atom!(
     /// A colon.
-    Colon, ":"
+    Colon = ":"
 );
 
 atom!(
     /// A dot.
-    Dot, "."
+    Dot = "."
 );
 
 atom! {
@@ -68,6 +206,7 @@ atom! {
     }
 }
 
+#[cfg(false)]
 atom! {
     /// Operators for binary expressions.
     pub enum Operator {
@@ -94,3 +233,38 @@ atom! {
         NotEq
     }
 }
+
+atom!(
+    /// `+`.
+    Plus = "+"
+);
+
+atom!(
+    /// `-`.
+    Minus = "-"
+);
+
+atom!(
+    /// `*`.
+    Star = "*"
+);
+
+atom!(
+    /// `/`.
+    Slash = "/"
+);
+
+atom!(
+    /// `%`.
+    Percent = "%"
+);
+
+atom!(
+    /// `=`.
+    Equal = "="
+);
+
+atom!(
+    /// `!`.
+    Bang = "!"
+);

@@ -133,7 +133,6 @@ fn is_invalid_integer_char(c: char) -> bool {
 
 impl Lex for IntegerLiteral<'_> {
     fn lex(s: &str) -> Result<(Token, &str), Error> {
-        // let (neg, rest) = extract(s, |c| c != '-');
         let (int, rest) = extract(s, is_invalid_integer_char);
 
         if int.starts_with('_') || int.ends_with('_') {
@@ -259,29 +258,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_int_lit_with_neg_sign() {
-        let input = "--123456";
-        assert_eq!(
-            IntegerLiteral::lex(input),
-            Ok((
-                Token::new(
-                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input))),
-                    Span::new(0, 8)
-                ),
-                ""
-            ))
-        )
-    }
-
-    #[test]
     fn parse_int_lit_with_separator() {
-        let input = "--123_456";
+        let input = "123_456";
         assert_eq!(
             IntegerLiteral::lex(input),
             Ok((
                 Token::new(
                     TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input))),
-                    Span::new(0, 9)
+                    Span::new(0, 7)
                 ),
                 ""
             ))

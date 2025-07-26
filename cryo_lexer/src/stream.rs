@@ -312,7 +312,7 @@ mod tests {
 
     use crate::{
         Token, TokenType,
-        atoms::{Assign, Semi},
+        atoms::{Equal, Semi},
         stream::{StreamLike, TokenStream, TokenStreamError},
     };
 
@@ -320,7 +320,7 @@ mod tests {
     fn consume_stream() {
         // Span::ZERO since the spans aren't important
         let mut stream = TokenStream::new(vec![
-            Token::new(TokenType::Assign(Assign), Span::ZERO),
+            Token::new(TokenType::Equal(Equal), Span::ZERO),
             Token::new(TokenType::Semi(Semi), Span::ZERO),
             Token::new(TokenType::Keyword(crate::atoms::Keyword::Let), Span::ZERO),
         ]);
@@ -328,7 +328,7 @@ mod tests {
         stream.with(|guard| {
             assert_eq!(
                 guard.advance(),
-                Ok(&Token::new(TokenType::Assign(Assign), Span::ZERO))
+                Ok(&Token::new(TokenType::Equal(Equal), Span::ZERO))
             );
 
             assert_eq!(

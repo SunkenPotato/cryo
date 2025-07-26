@@ -34,7 +34,10 @@ use std::fmt::Display;
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    atoms::{Assign, Colon, Comma, Dot, Keyword, LCurly, LParen, Operator, RCurly, RParen, Semi},
+    atoms::{
+        Bang, Colon, Comma, Dot, Equal, Keyword, LCurly, LParen, Minus, Percent, Plus, RCurly,
+        RParen, Semi, Slash, Star,
+    },
     identifier::Identifier,
     literal::Literal,
     stream::TokenStream,
@@ -61,151 +64,6 @@ impl<'source> TokenExt<'source> for Token<'source> {
 
 type LexFn = fn(&str) -> Result<(Token, &str), Error>;
 type Error = Spanned<LexicalError>;
-
-#[macro_export]
-#[doc(hidden)]
-macro_rules! atom {
-    (
-        $(#[$attr:meta])*
-        $identifier:ident, $atom:expr
-    ) => {
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        $(#[$attr])*
-        pub struct $identifier;
-
-        impl $crate::Lex for $identifier {
-            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
-                let rest = s
-                    .strip_prefix($atom)
-                    .ok_or($crate::Error::new($crate::LexicalError::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len() as u32)))?;
-                Ok(($crate::Token::new($crate::TokenType::$identifier(Self), cryo_span::Span::new(0, $atom.len() as u32)), rest))
-            }
-        }
-
-        token_marker!($identifier);
-
-        #[cfg(test)]
-        ::paste::paste! {
-            #[test]
-            #[allow(non_snake_case)]
-            fn [<lex_ $identifier>]() {
-                use $crate::Lex;
-
-                assert_eq!(
-                    $identifier::lex($atom),
-                    Ok((
-                        $crate::Token::new(
-                            $crate::TokenType::$identifier($identifier),
-                            cryo_span::Span::new(0, $atom.len() as u32)
-                        ),
-                        ""
-                    ))
-                )
-            }
-        }
-    };
-
-
-    (
-        $(#[$attr:meta])*
-        $visibility:vis enum $identifier:ident {
-            $(
-                $(#[$variant_attr:meta])*
-                #($atom:expr)
-                $variant:ident
-            ),*
-        } with $constructor:path
-    ) => {
-        $(#[$attr])*
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        $visibility enum $identifier {
-            $(
-                $(#[$variant_attr])*
-                $variant,
-            )*
-        }
-
-        impl $identifier {
-            #[doc = concat!("The variants ", stringify!($identifier), " may have")]
-            $visibility const VARIANTS: &[Self] = &[$(
-                Self::$variant,
-            )*];
-
-            #[doc = concat!("Return the string this variant would be able to be parsed from")]
-            $visibility const fn as_str(&self) -> &str {
-                match self {
-                    $(
-                        Self::$variant => $atom,
-                    )*
-                }
-            }
-        }
-
-        impl $crate::Lex for $identifier {
-            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
-                for variant in Self::VARIANTS {
-                    let atom = variant.as_str();
-                    if let Some(v) = s.strip_prefix(variant.as_str()) {
-                        return Ok(($crate::Token::new($constructor(*variant), cryo_span::Span::new(0, atom.len() as u32)), v))
-                    }
-                }
-
-                let (start, _) = $crate::find_token_end(s);
-                Err($crate::Error::new($crate::LexicalError::SequenceNotFound(stringify!($identifier)), cryo_span::Span::new(0, start.len() as u32)))
-            }
-        }
-
-        token_marker!($identifier);
-
-        #[cfg(test)]
-        ::paste::paste! {
-            #[allow(non_snake_case)]
-            mod [<$identifier _tests>] {
-                use $crate::Lex;
-                $(
-                    #[test]
-                    #[allow(non_snake_case)]
-                    fn [<lex_ $identifier _ $variant>]() {
-                        assert_eq!(
-                            super::$identifier::lex(super::$identifier::$variant.as_str()),
-                            Ok((
-                                $crate::Token::new(
-                                    $constructor(
-                                        super::$identifier::$variant
-                                    ),
-                                    cryo_span::Span::new(0, super::$identifier::$variant.as_str().len() as u32)
-                                ),
-                                ""
-                            ))
-                        );
-                    }
-                )*
-            }
-        }
-    };
-
-    (
-        $(#[$attr:meta])*
-        $visibility:vis enum $identifier:ident {
-            $(
-                $(#[$variant_attr:meta])*
-                #($atom:expr)
-                $variant:ident
-            ),*
-        }
-    ) => {
-        $crate::atom!(
-            $(#[$attr])*
-            $visibility enum $identifier {
-                $(
-                    $(#[$variant_attr])*
-                    #($atom)
-                    $variant
-                ),*
-            } with $crate::TokenType::$identifier
-        );
-    };
-}
 
 /// Split an input string while the supplied function returns `false`.
 pub fn extract(s: &str, f: impl Fn(char) -> bool) -> (&str, &str) {
@@ -243,28 +101,55 @@ trait Lex: Sized {
 pub enum TokenType<'source> {
     /// A keyword.
     Keyword(Keyword),
+
     /// An identifier.
     Identifier(Identifier<'source>),
+
     /// A literal.
     Literal(Literal<'source>),
-    /// An arithmetic operator.
-    Operator(Operator),
-    /// An assign token (`=`).
-    Assign(Assign),
+
     /// A semicolon (`;`).
     Semi(Semi),
+
+    /// A plus (`+`).
+    Plus(Plus),
+
+    /// A minus (`-`).
+    Minus(Minus),
+
+    /// A star (`*`).
+    Star(Star),
+
+    /// A slash (`/`).
+    Slash(Slash),
+
+    /// A percent sign (`%`).
+    Percent(Percent),
+
+    /// An equals sign (`=`).
+    Equal(Equal),
+
+    /// A bang (`!`).
+    Bang(Bang),
+
     /// The right curly brace ('{').
     RCurly(RCurly),
+
     /// The left curly brace ('}')
     LCurly(LCurly),
+
     /// The left parenthesis (`(`).
     LParen(LParen),
+
     /// The right parenthesis (`)`).
     RParen(RParen),
+
     /// A comma.
     Comma(Comma),
+
     /// A colon.
     Colon(Colon),
+
     /// A dot.
     Dot(Dot),
 }
@@ -286,8 +171,13 @@ impl<'s> TokenType<'s> {
         Keyword::lex,
         Identifier::lex,
         Literal::lex,
-        Operator::lex,
-        Assign::lex,
+        Plus::lex,
+        Minus::lex,
+        Star::lex,
+        Slash::lex,
+        Percent::lex,
+        Bang::lex,
+        Equal::lex,
         Semi::lex,
         RCurly::lex,
         LCurly::lex,
@@ -380,7 +270,7 @@ mod tests {
 
     use crate::{
         Token, TokenType,
-        atoms::{Assign, Keyword, Operator, Semi},
+        atoms::{Equal, Keyword, Semi},
         identifier::Identifier,
         lexer,
         literal::{IntegerLiteral, Literal, StringLiteral},
@@ -393,12 +283,12 @@ mod tests {
         let expected = [
             Token::new(TokenType::Keyword(Keyword::Let), Span::new(0, 3)),
             Token::new(TokenType::Identifier(Identifier("input")), Span::new(4, 9)),
-            Token::new(TokenType::Assign(Assign), Span::new(10, 11)),
+            Token::new(TokenType::Equal(Equal), Span::new(10, 11)),
             Token::new(
                 TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral("20"))),
                 Span::new(12, 14),
             ),
-            Token::new(TokenType::Operator(Operator::Add), Span::new(15, 16)),
+            Token::new(TokenType::Plus(crate::atoms::Plus), Span::new(15, 16)),
             Token::new(
                 TokenType::Literal(Literal::StringLiteral(StringLiteral("hello"))),
                 Span::new(17, 24),
