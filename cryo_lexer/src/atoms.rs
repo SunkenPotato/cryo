@@ -70,7 +70,7 @@ atom! {
 
 atom! {
     /// Operators for binary expressions.
-    pub enum Operators {
+    pub enum Operator {
         /// The addition operator (`+`).
         #("+")
         Add,

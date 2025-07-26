@@ -17,5 +17,6 @@ where
     let Spanned { t, span } = parser.spanning::<T>().unwrap();
 
     assert_eq!(t, expect.t);
-    assert_eq!(span, expect.span)
+    assert_eq!(span, expect.span);
+    assert!(parser.stream.remaining().is_empty());
 }

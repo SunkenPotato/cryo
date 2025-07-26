@@ -114,7 +114,7 @@ mod tests {
 
     use crate::{
         expr::{
-            Expr,
+            BaseExpr, Expr,
             literal::{IntegerLiteral, Literal, StringLiteral},
         },
         test_util::assert_parse,
@@ -125,7 +125,9 @@ mod tests {
         assert_parse(
             "--123_456",
             Spanned::new(
-                Expr::Lit(Literal::IntegerLiteral(IntegerLiteral::Value(123456))),
+                Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                    IntegerLiteral::Value(123456),
+                ))),
                 Span::new(0, 9),
             ),
         );
@@ -136,7 +138,9 @@ mod tests {
         assert_parse(
             "2147483648",
             Spanned::new(
-                Expr::Lit(Literal::IntegerLiteral(IntegerLiteral::Overflow)),
+                Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                    IntegerLiteral::Overflow,
+                ))),
                 Span::new(0, 10),
             ),
         );
@@ -147,8 +151,8 @@ mod tests {
         assert_parse(
             "\"hello, world!\\n\"",
             Spanned::new(
-                Expr::Lit(Literal::StringLiteral(StringLiteral::Value(Box::from(
-                    "hello, world!\n",
+                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(StringLiteral::Value(
+                    Box::from("hello, world!\n"),
                 )))),
                 Span::new(0, 17),
             ),
@@ -160,7 +164,9 @@ mod tests {
         assert_parse(
             "\"hello, world\\x\"",
             Spanned::new(
-                Expr::Lit(Literal::StringLiteral(StringLiteral::InvalidEscape('x'))),
+                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(
+                    StringLiteral::InvalidEscape('x'),
+                ))),
                 Span::new(0, 16),
             ),
         );

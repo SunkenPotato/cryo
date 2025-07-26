@@ -4,15 +4,18 @@
 //!
 //! View [`TokenStream`] for more information.
 
+use std::fmt::Debug;
+
 use crate::Token;
-pub use guard::Guard;
+pub use guard::{CheckpointGuard, Guard};
+use smallvec::SmallVec;
 
 /// A token stream.
 ///
 /// Token streams cannot be created manually, only through the lexer.
 ///
 /// To interact with a token stream, create a guard with [`StreamLike::with`] or obtain a non-tracking reference with [`TokenStream::non_tracking`].
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TokenStream<'source> {
     pub(crate) inner: Box<[Token<'source>]>,
     pub(crate) cursor: usize,
@@ -50,6 +53,14 @@ impl<'source> TokenStream<'source> {
     }
 }
 
+impl Debug for TokenStream<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TokenStream")
+            .field("inner", &&self.inner[self.cursor..])
+            .finish()
+    }
+}
+
 /// A token stream error.
 #[derive(Debug, PartialEq, Eq)] // only for tests, since all externals use dyn ParseError
 pub enum TokenStreamError {
@@ -60,9 +71,14 @@ pub enum TokenStreamError {
 }
 
 mod guard {
-    use std::array;
+    use std::{
+        array,
+        fmt::Debug,
+        ops::{Deref, DerefMut},
+    };
 
     use cryo_span::Spanned;
+    use smallvec::SmallVec;
 
     use crate::{FromToken, Token, TokenExt, stream::TokenStreamError};
 
@@ -137,6 +153,49 @@ mod guard {
             array::try_from_fn(|idx| self.peek_nth(idx))
         }
     }
+
+    impl Debug for Guard<'_, '_> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("Guard")
+                .field("inner", &&self.stream[*self.cursor..])
+                .finish()
+        }
+    }
+
+    /// A guard with checkpoints.
+    ///
+    /// Allows for rolling back to when the [`CheckpointGuard::checkpoint`] method was called.
+    pub struct CheckpointGuard<'stream, 'source> {
+        pub(crate) guard: Guard<'stream, 'source>,
+        pub(crate) checkpoints: SmallVec<[usize; 4]>,
+    }
+
+    impl<'stream, 'source> CheckpointGuard<'stream, 'source> {
+        /// Store the current state of the guard.
+        pub fn checkpoint(&mut self) {
+            self.checkpoints.push(*self.guard.cursor);
+        }
+
+        /// Apply the last checkpoint of the guard.
+        pub fn unroll(&mut self) {
+            let new_cursor = self.checkpoints.pop().unwrap_or(*self.guard.cursor);
+            *self.guard.cursor = new_cursor;
+        }
+    }
+
+    impl<'source, 'stream> Deref for CheckpointGuard<'source, 'stream> {
+        type Target = Guard<'source, 'stream>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.guard
+        }
+    }
+
+    impl DerefMut for CheckpointGuard<'_, '_> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.guard
+        }
+    }
 }
 
 trait Sealed {}
@@ -172,6 +231,9 @@ pub trait StreamLike: Sealed {
     where
         R: Fails,
         F: FnOnce(&mut Guard) -> R;
+
+    /// Create a checkpoint guard. This is similar to the guard `with` provides, except that one must rollback changes manually.
+    fn checkpointed(&mut self) -> CheckpointGuard;
 }
 
 impl Sealed for TokenStream<'_> {}
@@ -198,6 +260,16 @@ impl<'source> StreamLike for TokenStream<'source> {
 
         result
     }
+
+    fn checkpointed(&mut self) -> CheckpointGuard {
+        CheckpointGuard {
+            guard: Guard {
+                cursor: &mut self.cursor,
+                stream: &self.inner,
+            },
+            checkpoints: SmallVec::new(),
+        }
+    }
 }
 
 impl<'source, 'stream> StreamLike for Guard<'source, 'stream> {
@@ -220,6 +292,16 @@ impl<'source, 'stream> StreamLike for Guard<'source, 'stream> {
         }
 
         result
+    }
+
+    fn checkpointed(&mut self) -> CheckpointGuard {
+        CheckpointGuard {
+            guard: Guard {
+                cursor: self.cursor,
+                stream: self.stream,
+            },
+            checkpoints: SmallVec::new(),
+        }
     }
 }
 

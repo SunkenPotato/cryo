@@ -3,7 +3,6 @@
 //! A lexer will take an input and split the input into [`Token`]s comprehensible by the parser without modifying the inputs.
 
 #![feature(array_try_from_fn)]
-#![feature(result_flattening)]
 
 macro_rules! token_marker {
     (
@@ -35,7 +34,7 @@ use std::fmt::Display;
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    atoms::{Assign, Colon, Comma, Dot, Keyword, LCurly, LParen, Operators, RCurly, RParen, Semi},
+    atoms::{Assign, Colon, Comma, Dot, Keyword, LCurly, LParen, Operator, RCurly, RParen, Semi},
     identifier::Identifier,
     literal::Literal,
     stream::TokenStream,
@@ -249,7 +248,7 @@ pub enum TokenType<'source> {
     /// A literal.
     Literal(Literal<'source>),
     /// An arithmetic operator.
-    Operators(Operators),
+    Operator(Operator),
     /// An assign token (`=`).
     Assign(Assign),
     /// A semicolon (`;`).
@@ -287,7 +286,7 @@ impl<'s> TokenType<'s> {
         Keyword::lex,
         Identifier::lex,
         Literal::lex,
-        Operators::lex,
+        Operator::lex,
         Assign::lex,
         Semi::lex,
         RCurly::lex,
@@ -381,7 +380,7 @@ mod tests {
 
     use crate::{
         Token, TokenType,
-        atoms::{Assign, Keyword, Operators, Semi},
+        atoms::{Assign, Keyword, Operator, Semi},
         identifier::Identifier,
         lexer,
         literal::{IntegerLiteral, Literal, StringLiteral},
@@ -399,7 +398,7 @@ mod tests {
                 TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral("20"))),
                 Span::new(12, 14),
             ),
-            Token::new(TokenType::Operators(Operators::Add), Span::new(15, 16)),
+            Token::new(TokenType::Operator(Operator::Add), Span::new(15, 16)),
             Token::new(
                 TokenType::Literal(Literal::StringLiteral(StringLiteral("hello"))),
                 Span::new(17, 24),

@@ -27,6 +27,7 @@ dependencies = [
  "cryo_span",
  "paste",
  "sealed_trait",
+ "smallvec",
 ]
 
 [[package]]
@@ -265,6 +266,12 @@ checksum = "458ff2caeb321b63d0e94b45c62b9587d18a16bb06f43930d91be095402c9041"
 dependencies = [
  "paste",
 ]
+
+[[package]]
+name = "smallvec"
+version = "1.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "syn"

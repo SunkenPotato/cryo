@@ -133,21 +133,20 @@ fn is_invalid_integer_char(c: char) -> bool {
 
 impl Lex for IntegerLiteral<'_> {
     fn lex(s: &str) -> Result<(Token, &str), Error> {
-        let (neg, rest) = extract(s, |c| c != '-');
-        let (int, rest) = extract(rest, is_invalid_integer_char);
-        let total_len = neg.len() + int.len();
+        // let (neg, rest) = extract(s, |c| c != '-');
+        let (int, rest) = extract(s, is_invalid_integer_char);
 
         if int.starts_with('_') || int.ends_with('_') {
             return Err(Error::new(
                 LexicalError::InvalidSequence,
-                Span::new(0, total_len as u32),
+                Span::new(0, int.len() as u32),
             ));
         }
 
         Ok((
             Token::new(
-                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(&s[..total_len]))),
-                Span::new(0, total_len as u32),
+                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(&s[..int.len()]))),
+                Span::new(0, int.len() as u32),
             ),
             rest,
         ))
