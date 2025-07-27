@@ -7,6 +7,7 @@
 
 pub mod atoms;
 pub mod expr;
+pub mod ident;
 
 #[cfg(test)]
 mod test_util;
