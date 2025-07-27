@@ -63,8 +63,9 @@ impl TokenExt for Token {
     }
 }
 
-type LexFn = fn(&str) -> Result<(Token, &str), Error>;
-type Error = Spanned<LexicalError>;
+type LexFn = fn(&str) -> Result<(Token, &str), LexicalError>;
+/// An error returned by the lexer.
+pub type LexicalError = Spanned<LexicalErrorKind>;
 
 /// A symbol.
 ///
@@ -98,7 +99,7 @@ pub(crate) fn find_token_end(s: &str) -> (&str, &str) {
 }
 
 trait Lex: Sized {
-    fn lex(s: &str) -> Result<(Token, &str), Error>;
+    fn lex(s: &str) -> Result<(Token, &str), LexicalError>;
 }
 
 /// The possible types a token may be. `'source` refers to the lifetime of the input given to the parser.
@@ -190,14 +191,14 @@ impl TokenType {
 }
 
 impl Lex for TokenType {
-    fn lex(s: &str) -> Result<(Token, &str), Error> {
+    fn lex(s: &str) -> Result<(Token, &str), LexicalError> {
         for f in Self::LEX_FUNCTIONS {
             if let Ok(v) = f(s) {
                 return Ok(v);
             }
         }
-        Err(Error::new(
-            LexicalError::NoMatch,
+        Err(LexicalError::new(
+            LexicalErrorKind::NoMatch,
             Span::new(0, s.len() as u32),
         ))
     }
@@ -205,7 +206,7 @@ impl Lex for TokenType {
 
 /// Errors that may occur during lexing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LexicalError {
+pub enum LexicalErrorKind {
     /// An expected sequence was not found.
     SequenceNotFound(&'static str),
     /// An invalid sequence was not found.
@@ -218,7 +219,7 @@ pub enum LexicalError {
     NoProgress,
 }
 
-impl Display for LexicalError {
+impl Display for LexicalErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let e_str = match self {
             Self::SequenceNotFound(s) => format!("sequence not found: '{s}'"),
@@ -237,7 +238,7 @@ impl Display for LexicalError {
 ///
 /// The function will attempt to convert the supplied input into tokens and return a [`TokenStream`] which can be used to inspect the tokens generated. \
 /// If it fails, the function will return a spanned [`LexicalError`] pointing to where the erroneous input is.
-pub fn lexer(input: &str) -> Result<TokenStream, Error> {
+pub fn lexer(input: &str) -> Result<TokenStream, LexicalError> {
     let mut tokens = vec![];
     let mut loop_input = input.trim();
     let mut cursor = input.len() - loop_input.len();
@@ -246,7 +247,7 @@ pub fn lexer(input: &str) -> Result<TokenStream, Error> {
         let (mut token, rest) = TokenType::lex(loop_input)?;
 
         if loop_input.len() == rest.len() {
-            return Err(Error::zero(LexicalError::NoProgress));
+            return Err(LexicalError::zero(LexicalErrorKind::NoProgress));
         }
 
         let token_len = loop_input.len() - rest.len();
@@ -264,7 +265,7 @@ pub fn lexer(input: &str) -> Result<TokenStream, Error> {
 }
 
 impl TryInto<TokenStream> for &'_ str {
-    type Error = Error;
+    type Error = LexicalError;
 
     fn try_into(self) -> Result<TokenStream, Self::Error> {
         lexer(self)

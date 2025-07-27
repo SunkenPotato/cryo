@@ -13,10 +13,10 @@ macro_rules! atom {
         pub struct $identifier;
 
         impl $crate::Lex for $identifier {
-            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
+            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::LexicalError> {
                 let rest = s
                     .strip_prefix($atom)
-                    .ok_or($crate::Error::new($crate::LexicalError::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len() as u32)))?;
+                    .ok_or($crate::LexicalError::new($crate::LexicalErrorKind::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len() as u32)))?;
                 Ok(($crate::Token::new($crate::TokenType::$identifier(Self), cryo_span::Span::new(0, $atom.len() as u32)), rest))
             }
         }

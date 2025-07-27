@@ -1,11 +1,5 @@
 [workspace]
-members = [
-    "cryo_intern",
-    "cryo_lexer",
-    "cryo_parser",
-    "cryo_parser_proc_macro",
-    "cryo_span",
-]
+members = ["cryo", "cryo_intern", "cryo_lexer", "cryo_parser", "cryo_span"]
 resolver = "3"
 
 [workspace.lints.rust]
