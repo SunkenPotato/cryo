@@ -106,7 +106,7 @@ macro_rules! atom {
                     #[allow(non_snake_case)]
                     fn [<lex_ $identifier _ $variant>]() {
                         assert_eq!(
-                            super::$identifier::lex(super::$identifier::$variant.as_str()),
+                            $crate::TokenType::lex(super::$identifier::$variant.as_str()),
                             Ok((
                                 $crate::Token::new(
                                     $constructor(

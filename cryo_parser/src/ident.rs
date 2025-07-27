@@ -23,6 +23,7 @@ keywords! {
     MUT = mut
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 /// A validated identifier, that is, one proven not to be a keyword.
 pub struct Ident {
     /// The actual identifier.
@@ -47,5 +48,27 @@ impl Parse for Ident {
                 }),
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use cryo_lexer::Symbol;
+    use cryo_span::{Span, Spanned};
+
+    use crate::{ident::Ident, test_util::assert_parse};
+
+    #[test]
+    fn do_not_parse_kw_as_ident() {
+        assert_parse(
+            "let",
+            Spanned::new(
+                Ident {
+                    sym: Symbol::new("let"),
+                    valid: false,
+                },
+                Span::new(0, 3),
+            ),
+        );
     }
 }

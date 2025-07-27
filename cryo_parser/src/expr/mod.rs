@@ -10,7 +10,7 @@ use cryo_lexer::{
     stream::{Guard, StreamLike},
 };
 
-use crate::{Parse, expr::literal::Literal};
+use crate::{Parse, expr::literal::Literal, ident::Ident};
 
 pub mod literal;
 
@@ -148,11 +148,16 @@ impl Parse for Expr {
 pub enum BaseExpr {
     /// A literal value.
     Lit(Literal),
+    /// A binding usage.
+    BindingUsage(Ident),
 }
 
 impl Parse for BaseExpr {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
-        tokens.with(Literal::parse).map(Self::Lit)
+        tokens
+            .with(Literal::parse)
+            .map(Self::Lit)
+            .or_else(|_| tokens.with(Ident::parse).map(Self::BindingUsage))
     }
 }
 

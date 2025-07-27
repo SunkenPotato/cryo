@@ -27,7 +27,7 @@ impl Lex for Literal {
             return StringLiteral::lex(s);
         }
 
-        if let Some('0'..='9' | '-') = first {
+        if let Some('0'..='9') = first {
             return IntegerLiteral::lex(s);
         }
 
