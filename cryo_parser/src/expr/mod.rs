@@ -1,33 +1,87 @@
+//! Expressions.
+//!
+//! Expressions are components, that, when evaluated, produce a value.
+
 use std::fmt::Debug;
 
-use cryo_lexer::stream::{Guard, StreamLike};
+use cryo_lexer::{
+    TokenType,
+    atoms::Equal,
+    stream::{Guard, StreamLike},
+};
 
 use crate::{Parse, expr::literal::Literal};
-use cryo_lexer::atoms::Operator as OpToken;
 
 pub mod literal;
 
+/// Binary operators.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Operator {
+    /// The addition operator.
     Add,
+    /// The subtraction operator.
     Sub,
+    /// The multiplication operator.
     Mul,
+    /// The division operator.
     Div,
+    /// The remainder operator (`%`).
     Rem,
+    /// The equality comparison operator.
     Eq,
+    /// The inequality comparison operator.
     NotEq,
+}
+
+impl Operator {
+    fn parse_1<const CONSUME: bool>(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        let op = match tokens.peek()?.t {
+            TokenType::Plus(_) => Operator::Add,
+            TokenType::Minus(_) => Operator::Sub,
+            TokenType::Star(_) => Operator::Mul,
+            TokenType::Slash(_) => Operator::Div,
+            TokenType::Percent(_) => Operator::Rem,
+            TokenType::Equal(_) => {
+                tokens.peek_require::<Equal>()?;
+                if CONSUME {
+                    tokens
+                        .advance()
+                        .expect("stream should not be empty since it has been checked");
+                }
+                Operator::Eq
+            }
+            TokenType::Bang(_) => {
+                tokens.peek_require::<Equal>()?;
+                if CONSUME {
+                    tokens
+                        .advance()
+                        .expect("stream should not be empty since it has been checked");
+                }
+                Operator::NotEq
+            }
+            t => {
+                return Err(crate::ParseError::TokenStreamError(
+                    cryo_lexer::stream::TokenStreamError::IncorrectToken(t),
+                ));
+            }
+        };
+        if CONSUME {
+            tokens
+                .advance()
+                .expect("stream should not be empty since it has been checked");
+        }
+        Ok(op)
+    }
 }
 
 impl Parse for Operator {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
-        tokens
-            .advance_require::<OpToken>()
-            .map(|v| (*v.t).into())
-            .map_err(Into::into)
+        Self::parse_1::<true>(tokens)
     }
 }
 
 impl Operator {
+    /// Return the precedence of this operator.
     pub const fn precedence(&self) -> u8 {
         match self {
             Self::NotEq | Self::Eq => 1,
@@ -37,30 +91,23 @@ impl Operator {
     }
 }
 
-impl From<OpToken> for Operator {
-    fn from(value: OpToken) -> Self {
-        match value {
-            OpToken::Add => Self::Add,
-            OpToken::Sub => Self::Sub,
-            OpToken::Mul => Self::Mul,
-            OpToken::Div => Self::Div,
-            OpToken::Rem => Self::Rem,
-            OpToken::Eq => Self::Eq,
-            OpToken::NotEq => Self::NotEq,
-        }
-    }
-}
-
+/// A binary expression.
 #[derive(Debug, PartialEq, Eq)]
 pub struct BinaryExpr {
+    /// The left-hand side of this expression.
     pub lhs: Box<Expr>,
+    /// The operator.
     pub op: Operator,
+    /// The right-hand side of this expression.
     pub rhs: Box<Expr>,
 }
 
+/// An expression.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expr {
+    /// A simple expression.
     BaseExpr(BaseExpr),
+    /// A binary expression.
     BinaryExpr(BinaryExpr),
 }
 
@@ -68,9 +115,7 @@ impl Expr {
     fn parse_1(tokens: &mut Guard, min_prec: u8) -> crate::ParseResult<Self> {
         let mut lhs = tokens.with(BaseExpr::parse).map(Self::BaseExpr)?;
 
-        while let Ok(op) = tokens.peek_require::<OpToken>() {
-            let op: Operator = (*op.t).into();
-
+        while let Ok(op) = tokens.with(Operator::parse_1::<false>) {
             if op.precedence() <= min_prec {
                 break;
             }
@@ -98,8 +143,10 @@ impl Parse for Expr {
     }
 }
 
+/// A base, or simple expression.
 #[derive(Debug, PartialEq, Eq)]
 pub enum BaseExpr {
+    /// A literal value.
     Lit(Literal),
 }
 
@@ -111,6 +158,7 @@ impl Parse for BaseExpr {
 
 #[cfg(test)]
 mod tests {
+    #![allow(missing_docs)]
     use cryo_span::{Span, Spanned};
 
     use crate::{
@@ -194,10 +242,8 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "integer parsing cannot differentiate between subtraction and negation operator"]
     fn parse_complex_binary_expr() {
         assert_parse(
-            // (2 + (3 * 4)) == ((6 * 2) + 2)
             "2 + 3 * 4 == 6 / 2 - 2",
             Spanned::new(
                 Expr::BinaryExpr(BinaryExpr {

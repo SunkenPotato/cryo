@@ -11,7 +11,6 @@ macro_rules! token_marker {
         impl $crate::Sealed for $type {}
 
         impl $crate::TokenLike for $type {
-            const NAME: &'static str = stringify!($type);
             fn from_token(token: &$crate::Token) -> Option<::cryo_span::Spanned<&Self>> {
                 match token.t {
                     $crate::TokenType::$type(ref v) => {
@@ -29,10 +28,10 @@ pub mod identifier;
 pub mod literal;
 pub mod stream;
 
-use std::{fmt::Display, ops::Deref};
+use std::fmt::Display;
 
+use cryo_intern::InternStr;
 use cryo_span::{Span, Spanned};
-use internment::Intern;
 
 use crate::{
     atoms::{
@@ -58,6 +57,7 @@ pub trait TokenExt {
 }
 
 impl TokenExt for Token {
+    #[track_caller]
     fn require<T: TokenLike>(&self) -> Option<Spanned<&T>> {
         T::from_token(self)
     }
@@ -69,22 +69,7 @@ type Error = Spanned<LexicalError>;
 /// A symbol.
 ///
 /// A symbol represents an interned slice of input.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct Symbol(pub Intern<str>);
-
-impl Deref for Symbol {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<&str> for Symbol {
-    fn from(value: &str) -> Self {
-        Self(Intern::from(value))
-    }
-}
+pub type Symbol = InternStr;
 
 /// Split an input string while the supplied function returns `false`.
 pub fn extract(s: &str, f: impl Fn(char) -> bool) -> (&str, &str) {
@@ -177,8 +162,6 @@ trait Sealed {}
 /// Trait for attempting to convert `Token`s into concrete types.
 #[allow(private_bounds)]
 pub trait TokenLike: Sealed {
-    /// The name of the token.
-    const NAME: &'static str;
     /// Attempt to convert a given token into `Self`.
     fn from_token(token: &Token) -> Option<Spanned<&Self>>;
 }
@@ -231,6 +214,8 @@ pub enum LexicalError {
     EndOfInput,
     /// The lexer could not convert the supplied input into any tokens.
     NoMatch,
+    /// No progress was made by the lexer.
+    NoProgress,
 }
 
 impl Display for LexicalError {
@@ -240,6 +225,7 @@ impl Display for LexicalError {
             Self::EndOfInput => "unexpected end of input".to_owned(),
             Self::NoMatch => "could not parse the given stream".to_owned(),
             Self::InvalidSequence => "invalid sequence".to_owned(),
+            Self::NoProgress => "the lexer could not make any progress".to_owned(),
         };
         write!(f, "lexical error: {e_str}")?;
 
@@ -258,6 +244,10 @@ pub fn lexer(input: &str) -> Result<TokenStream, Error> {
 
     while !loop_input.is_empty() {
         let (mut token, rest) = TokenType::lex(loop_input)?;
+
+        if loop_input.len() == rest.len() {
+            return Err(Error::zero(LexicalError::NoProgress));
+        }
 
         let token_len = loop_input.len() - rest.len();
         token = token.offset(cursor as u32);

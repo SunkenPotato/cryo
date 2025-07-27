@@ -14,7 +14,24 @@ pub struct Identifier(pub Symbol);
 
 fn split_at_ident_end(s: &str) -> (&str, &str) {
     extract(s, |c| {
-        matches!(c, ',' | ';' | '(' | ')' | '{' | '}' | ':' | '.' | ' ')
+        matches!(
+            c,
+            ',' | ';'
+                | '('
+                | ')'
+                | '{'
+                | '}'
+                | ':'
+                | '.'
+                | '-'
+                | '+'
+                | '*'
+                | '/'
+                | '%'
+                | '='
+                | '!'
+                | ' '
+        )
     })
 }
 
@@ -47,7 +64,6 @@ impl Lex for Identifier {
 }
 
 impl TokenLike for Identifier {
-    const NAME: &'static str = "Identifier";
     fn from_token(token: &Token) -> Option<Spanned<&Self>> {
         match token.t {
             TokenType::Identifier(ref id) => Some(Spanned::new(id, token.span)),

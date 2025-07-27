@@ -3,10 +3,10 @@
 //! Atoms are components of code that are constant and only can be parsed from one specific atom token.
 
 use cryo_lexer::{
-    FromToken,
+    TokenLike,
     atoms::{
-        Assign as AToken, Colon as ColToken, Comma as CToken, Dot as DToken, Keyword,
-        LCurly as LCToken, LParen as LPToken, RCurly as RCToken, RParen as RPToken, Semi as SToken,
+        Colon as ColToken, Comma as CToken, Dot as DToken, Equal as AToken, LCurly as LCToken,
+        LParen as LPToken, RCurly as RCToken, RParen as RPToken, Semi as SToken,
     },
     stream::Guard,
 };
@@ -20,9 +20,9 @@ trait True {}
 
 impl True for Assert<true> {}
 
-pub fn atom<S, T>(tokens: &mut Guard) -> Option<S>
+fn atom<S, T>(tokens: &mut Guard) -> Option<S>
 where
-    for<'s> T: FromToken<'s>,
+    T: TokenLike,
     Assert<{ size_of::<T>() == 0 }>: True,
     Assert<{ size_of::<S>() == 0 }>: True,
 {
@@ -35,26 +35,13 @@ where
 macro_rules! atom {
     ($name:ident, $from:ident) => {
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        #[doc = concat!("Parse helper for parsing the ", stringify!($name), " atom.")]
         pub struct $name;
 
         impl $name {
+            /// Parse this atom or return `None`.
             pub fn parse(tokens: &mut Guard) -> Option<Self> {
                 atom::<Self, $from>(tokens)
-            }
-        }
-    };
-
-    ($name:ident, $e:ident::$var:ident) => {
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-        pub struct $name;
-
-        impl $name {
-            pub fn parse(tokens: &mut Guard) -> Option<Self> {
-                if let $e::$var = **tokens.advance_require::<$e>().ok()? {
-                    return Some(Self);
-                } else {
-                    return None;
-                }
             }
         }
     };
@@ -69,10 +56,3 @@ atom!(RCurly, RCToken);
 atom!(LParen, LPToken);
 atom!(RParen, RPToken);
 atom!(Semi, SToken);
-
-atom!(Let, Keyword::Let);
-atom!(Mut, Keyword::Mut);
-atom!(If, Keyword::If);
-atom!(Else, Keyword::Else);
-atom!(Fun, Keyword::Fun);
-atom!(Struct, Keyword::Struct);

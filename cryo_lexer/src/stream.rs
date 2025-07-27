@@ -6,7 +6,7 @@
 
 use std::fmt::Debug;
 
-use crate::Token;
+use crate::{Token, TokenType};
 pub use guard::Guard;
 
 /// A token stream.
@@ -21,7 +21,19 @@ pub struct TokenStream {
 }
 
 impl TokenStream {
+    #[cfg(not(test))]
+    #[cfg(false)]
     pub(crate) fn new(s: impl IntoIterator<Item = Token>) -> Self {
+        Self {
+            inner: s.into_iter().collect(),
+            cursor: 0,
+        }
+    }
+
+    // so that tests do not have to interact with the lexer.
+    //#[cfg(test)]
+    #[allow(missing_docs)]
+    pub fn new(s: impl IntoIterator<Item = Token>) -> Self {
         Self {
             inner: s.into_iter().collect(),
             cursor: 0,
@@ -66,7 +78,7 @@ pub enum TokenStreamError {
     /// An unexpected end of input was reached.
     EndOfInput,
     /// The token type the caller requested did not match the matching token.
-    IncorrectToken(&'static str),
+    IncorrectToken(TokenType),
 }
 
 mod guard {
@@ -87,11 +99,12 @@ mod guard {
         ///
         /// # Errors
         /// Returns [`TokenStreamError::EndOfInput`] if there are no tokens left.
+        #[track_caller]
         pub fn advance(&mut self) -> Result<&Token, TokenStreamError> {
-            self.stream
-                .get(*self.cursor)
-                .inspect(|_| *self.cursor += 1)
-                .ok_or(TokenStreamError::EndOfInput)
+            match self.stream.get(*self.cursor).inspect(|_| *self.cursor += 1) {
+                Some(v) => Ok(v),
+                None => Err(TokenStreamError::EndOfInput),
+            }
         }
 
         /// Advance the stream and attempt to convert the token into `T` via `FromToken`.
@@ -100,9 +113,16 @@ mod guard {
         /// Returns [`TokenStreamError::IncorrectToken`] if the token was not able to be converted to `T`.
         ///
         /// See also [`TokenStreamGuard::advance`].
+        #[track_caller]
         pub fn advance_require<T: TokenLike>(&mut self) -> Result<Spanned<&T>, TokenStreamError> {
-            self.advance()
-                .and_then(|v| v.require().ok_or(TokenStreamError::IncorrectToken(T::NAME)))
+            self.stream
+                .get(*self.cursor)
+                .ok_or(TokenStreamError::EndOfInput)
+                .and_then(|v| {
+                    v.require::<T>()
+                        .ok_or(TokenStreamError::IncorrectToken(v.t))
+                })
+                .inspect(|_| *self.cursor += 1)
         }
 
         /// Peek at the next token in the stream. This function will not advance the stream, so calling it multiple times will result in the same outcome.
@@ -116,7 +136,7 @@ mod guard {
             T: TokenLike,
         {
             self.peek()
-                .and_then(|v| v.require().ok_or(TokenStreamError::IncorrectToken(T::NAME)))
+                .and_then(|v| v.require().ok_or(TokenStreamError::IncorrectToken(v.t)))
         }
 
         /// Peek at the nth token in this stream.
@@ -132,7 +152,7 @@ mod guard {
             T: TokenLike,
         {
             self.peek_nth(n)
-                .and_then(|v| v.require().ok_or(TokenStreamError::IncorrectToken(T::NAME)))
+                .and_then(|v| v.require().ok_or(TokenStreamError::IncorrectToken(v.t)))
         }
 
         /// Peek at the next `N` tokens in this stream.

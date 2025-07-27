@@ -6,9 +6,9 @@ use cryo_span::Spanned;
 use crate::{Parse, Parser};
 
 #[track_caller]
-pub fn assert_parse<'a, I, T>(input: I, expect: Spanned<T>)
+pub fn assert_parse<I, T>(input: I, expect: Spanned<T>)
 where
-    I: TryInto<TokenStream<'a>>,
+    I: TryInto<TokenStream>,
     I::Error: Debug,
     T: Parse + Debug + PartialEq,
 {

@@ -3,6 +3,7 @@
 //! Literal expressions are expressions that consist of literal tokens, i.e., they are direct and require no further computation when evaluated.
 
 use cryo_lexer::{
+    atoms::Minus,
     literal::{IntegerLiteral as IToken, StringLiteral as SToken},
     stream::StreamLike,
 };
@@ -35,21 +36,24 @@ impl Parse for Literal {
 /// This is a wrapper around [`i32`] and therefore has the same properties as `i32`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IntegerLiteral {
+    /// The value of this literal.
     Value(i32),
+    /// The literal would have resulted in an overflow.
     Overflow,
 }
 
 impl Parse for IntegerLiteral {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
-        let token = tokens.advance_require::<IToken>()?;
-        let mut int = 0i32;
         let mut sgn = 1;
 
-        for c in token.0.chars() {
+        while tokens.advance_require::<Minus>().is_ok() {
+            sgn *= -1;
+        }
+
+        let int_token = tokens.advance_require::<IToken>()?;
+        let mut int = 0i32;
+        for c in int_token.0.chars() {
             if let '_' = c {
-                continue;
-            } else if let '-' = c {
-                sgn *= -1;
                 continue;
             }
 
@@ -72,7 +76,9 @@ impl Parse for IntegerLiteral {
 /// An unescaped string literal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StringLiteral {
+    /// The value of this literal.
     Value(Box<str>),
+    /// The literal contained an invalid escape.
     InvalidEscape(char),
 }
 
@@ -110,6 +116,12 @@ impl Parse for StringLiteral {
 
 #[cfg(test)]
 mod tests {
+    use cryo_lexer::{
+        Symbol, Token, TokenType,
+        atoms::Minus,
+        literal::{IntegerLiteral as IntLitToken, Literal as LitToken},
+        stream::TokenStream,
+    };
     use cryo_span::{Span, Spanned};
 
     use crate::{
@@ -123,12 +135,20 @@ mod tests {
     #[test]
     fn parse_int_literal() {
         assert_parse(
-            "--123_456",
+            TokenStream::new([
+                Token::new(TokenType::Minus(Minus), Span::new(0, 1)),
+                Token::new(
+                    TokenType::Literal(LitToken::IntegerLiteral(IntLitToken(Symbol::new(
+                        "123_456",
+                    )))),
+                    Span::new(1, 8),
+                ),
+            ]),
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                    IntegerLiteral::Value(123456),
+                    IntegerLiteral::Value(-123456),
                 ))),
-                Span::new(0, 9),
+                Span::new(0, 8),
             ),
         );
     }
