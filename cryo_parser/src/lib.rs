@@ -35,6 +35,45 @@ trait Parse: Sized {
     fn parse(tokens: &mut Guard) -> ParseResult<Self>;
 }
 
+impl<T: Parse> Parse for Vec<T> {
+    fn parse(tokens: &mut Guard) -> ParseResult<Self> {
+        let mut buf = vec![];
+
+        while let Ok(v) = tokens.with(T::parse) {
+            buf.push(v);
+        }
+
+        Ok(buf)
+    }
+}
+
+/// A series of `T` punctuated by `P`. The last `T` does not have to be followed by `P`, in which case the `inner` field will be empty and the `T` will be stored in `last`.
+pub struct Punctuated<T, P> {
+    /// The series of `T` followed by `P`.
+    pub inner: Vec<(T, P)>,
+    /// The last `T`, which does not have to be followed by a `P`. If it were followed by `P`, it would be stored in `inner`.
+    pub last: Option<Box<T>>,
+}
+
+impl<T: Parse, P: Parse> Parse for Punctuated<T, P> {
+    fn parse(tokens: &mut Guard) -> ParseResult<Self> {
+        let mut inner = vec![];
+        let mut last = None;
+
+        while let Ok(t) = tokens.with(T::parse) {
+            match tokens.with(P::parse) {
+                Ok(p) => inner.push((t, p)),
+                Err(_) => {
+                    last.replace(Box::new(t));
+                    break;
+                }
+            }
+        }
+
+        Ok(Self { inner, last })
+    }
+}
+
 /// Parse a `T` from a stream or a guard.
 pub fn parse<T>(stream: &mut impl StreamLike) -> ParseResult<T>
 where

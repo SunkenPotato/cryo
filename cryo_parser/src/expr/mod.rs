@@ -6,11 +6,11 @@ use std::fmt::Debug;
 
 use cryo_lexer::{
     TokenType,
-    atoms::Equal,
+    atoms::{Equal, LCurly, RCurly},
     stream::{Guard, StreamLike},
 };
 
-use crate::{Parse, expr::literal::Literal, ident::Ident};
+use crate::{Parse, expr::literal::Literal, ident::Ident, stmt::Stmt};
 
 pub mod literal;
 
@@ -150,6 +150,26 @@ pub enum BaseExpr {
     Lit(Literal),
     /// A binding usage.
     BindingUsage(Ident),
+    /// A block expression.
+    BlockExpr(BlockExpr),
+}
+
+/// A block expression, i.e., a series of statements and a final optional tail expression surrounded by `{` and `}`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct BlockExpr {
+    stmts: Box<[Stmt]>,
+    tail: Option<Box<Expr>>,
+}
+
+impl Parse for BlockExpr {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        tokens.advance_require::<LCurly>()?;
+        let stmts = tokens.with(Vec::parse).unwrap().into_boxed_slice();
+        let tail = tokens.with(Expr::parse).map(Box::new).ok();
+        tokens.advance_require::<RCurly>()?;
+
+        Ok(Self { stmts, tail })
+    }
 }
 
 impl Parse for BaseExpr {
@@ -158,12 +178,14 @@ impl Parse for BaseExpr {
             .with(Literal::parse)
             .map(Self::Lit)
             .or_else(|_| tokens.with(Ident::parse).map(Self::BindingUsage))
+            .or_else(|_| tokens.with(BlockExpr::parse).map(Self::BlockExpr))
     }
 }
 
 #[cfg(test)]
 mod tests {
     #![allow(missing_docs)]
+    use cryo_lexer::Symbol;
     use cryo_span::{Span, Spanned};
 
     use crate::{
@@ -171,8 +193,12 @@ mod tests {
             BaseExpr, BinaryExpr, Expr, Operator,
             literal::{IntegerLiteral, Literal},
         },
+        ident::Ident,
+        stmt::{Binding, Stmt},
         test_util::assert_parse,
     };
+
+    use super::BlockExpr;
 
     #[test]
     fn parse_add() {
@@ -287,5 +313,68 @@ mod tests {
                 Span::new(0, 22),
             ),
         );
+    }
+
+    #[test]
+    fn parse_stmt_only_block() {
+        assert_parse(
+            "{ 5; 7; }",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::BlockExpr(BlockExpr {
+                    stmts: Box::new([
+                        Stmt::ExprSemi(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                            IntegerLiteral::Value(5),
+                        )))),
+                        Stmt::ExprSemi(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                            IntegerLiteral::Value(7),
+                        )))),
+                    ]),
+                    tail: None,
+                })),
+                Span::new(0, 9),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_tail_only_block() {
+        assert_parse(
+            "{ 5 }",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::BlockExpr(BlockExpr {
+                    stmts: Box::new([]),
+                    tail: Some(Box::new(Expr::BaseExpr(BaseExpr::Lit(
+                        Literal::IntegerLiteral(IntegerLiteral::Value(5)),
+                    )))),
+                })),
+                Span::new(0, 5),
+            ),
+        )
+    }
+
+    #[test]
+    fn parse_stmts_tail_block() {
+        assert_parse(
+            "{ let x = 5; x }",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::BlockExpr(BlockExpr {
+                    stmts: Box::new([Stmt::Binding(Binding {
+                        mutability: None,
+                        ident: Ident {
+                            sym: Symbol::new("x"),
+                            valid: true,
+                        },
+                        expr: Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                            IntegerLiteral::Value(5),
+                        ))),
+                    })]),
+                    tail: Some(Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
+                        sym: Symbol::new("x"),
+                        valid: true,
+                    })))),
+                })),
+                Span::new(0, 16),
+            ),
+        )
     }
 }
