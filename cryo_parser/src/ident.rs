@@ -23,7 +23,8 @@ macro_rules! keywords {
 keywords! {
     LET = let,
     MUT = mut,
-    IF = if
+    IF = if,
+    ELSE = else
 }
 
 /// A validated identifier, that is, one proven not to be a keyword.
@@ -64,22 +65,26 @@ impl Ident {
     }
 }
 
+impl From<Identifier> for Ident {
+    fn from(ident: Identifier) -> Self {
+        KEYWORDS.with(|keywords| match keywords.iter().find(|v| **v == ident.0) {
+            Some(v) => Self {
+                sym: *v,
+                valid: false,
+            },
+            None => Self {
+                sym: ident.0,
+                valid: true,
+            },
+        })
+    }
+}
+
 impl Parse for Ident {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
-        KEYWORDS.with(|keywords| {
-            let ident = tokens.advance_require::<Identifier>()?;
+        let ident = tokens.advance_require::<Identifier>()?;
 
-            match keywords.iter().find(|v| **v == ident.t.0) {
-                Some(v) => Ok(Self {
-                    sym: *v,
-                    valid: false,
-                }),
-                None => Ok(Self {
-                    sym: ident.t.0,
-                    valid: true,
-                }),
-            }
-        })
+        Ok(Self::from(*ident.t))
     }
 }
 

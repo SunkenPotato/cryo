@@ -41,7 +41,7 @@ impl TokenStream {
     }
 
     /// Create a non-tracking guard for this token stream. Operations applied to this guard will be immediately applied, in contrast to the guard provided by [`StreamLike::with`].
-    pub fn non_tracking(&mut self) -> Guard {
+    pub fn non_tracking(&'_ mut self) -> Guard<'_> {
         Guard {
             cursor: &mut self.cursor,
             stream: &self.inner,
