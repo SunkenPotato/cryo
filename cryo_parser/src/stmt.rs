@@ -38,7 +38,7 @@ impl Parse for Stmt {
     }
 }
 
-/// A variable binding.s
+/// A variable binding.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Binding {
     /// The mutability of this variable.

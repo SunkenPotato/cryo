@@ -22,7 +22,8 @@ macro_rules! keywords {
 
 keywords! {
     LET = let,
-    MUT = mut
+    MUT = mut,
+    IF = if
 }
 
 /// A validated identifier, that is, one proven not to be a keyword.

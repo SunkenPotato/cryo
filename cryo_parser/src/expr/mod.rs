@@ -10,7 +10,12 @@ use cryo_lexer::{
     stream::{Guard, StreamLike},
 };
 
-use crate::{Parse, expr::literal::Literal, ident::Ident, stmt::Stmt};
+use crate::{
+    Parse, ParseError,
+    expr::literal::Literal,
+    ident::{IF, Ident},
+    stmt::Stmt,
+};
 
 pub mod literal;
 
@@ -152,6 +157,8 @@ pub enum BaseExpr {
     BindingUsage(Ident),
     /// A block expression.
     BlockExpr(BlockExpr),
+    /// A conditional expression.
+    CondExpr(CondExpr),
 }
 
 /// A block expression, i.e., a series of statements and a final optional tail expression surrounded by `{` and `}`.
@@ -169,6 +176,47 @@ impl Parse for BlockExpr {
         tokens.advance_require::<RCurly>()?;
 
         Ok(Self { stmts, tail })
+    }
+}
+
+/// A conditional expression, where code is only executed if a certain condition is given.
+#[derive(PartialEq, Eq, Debug)]
+pub struct CondExpr {
+    /// The main `if` block, this is required.
+    pub if_block: IfBlock,
+    /// The optional `else if` block(s).
+    pub else_if_blocks: Vec<IfBlock>,
+    /// The else block, this will be evaluated if none of the conditions in the blocks return `true`.
+    pub else_block: Option<BlockExpr>,
+}
+
+impl Parse for CondExpr {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        let if_block = tokens.with(IfBlock::parse)?;
+        let mut else_if_blocks = vec![];
+    }
+}
+
+/// Represents a conditional block.
+#[derive(PartialEq, Eq, Debug)]
+pub struct IfBlock {
+    /// The condition for this block.
+    pub cond: Box<Expr>,
+    /// The code to be executed.
+    pub block: BlockExpr,
+}
+
+impl Parse for IfBlock {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        tokens
+            .with(Ident::parse)?
+            .require(&IF)
+            .map_err(|_| ParseError::MissingKw(IF.with(Clone::clone)))?;
+
+        let cond = Box::new(tokens.with(Expr::parse)?);
+        let block = tokens.with(BlockExpr::parse)?;
+
+        Ok(Self { cond, block })
     }
 }
 
