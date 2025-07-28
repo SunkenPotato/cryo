@@ -1,7 +1,6 @@
 [workspace]
+members = ["cryo", "cryo_intern", "cryo_lexer", "cryo_parser", "cryo_span"]
 resolver = "3"
-members = ["cryo_lexer", "cryo_parser", "cryo_parser_proc_macro", "cryo_span"]
-
 
 [workspace.lints.rust]
 missing_docs = "deny"

@@ -2,27 +2,19 @@
 //!
 //! Literal expressions are expressions that consist of literal tokens, i.e., they are direct and require no further computation when evaluated.
 
-use crate::{parse_error, parser::Parse};
-use cryo_lexer::literal::{IntegerLiteral as IToken, StringLiteral as SToken};
-use cryo_parser_proc_macro::Parse;
-use cryo_span::Spanned;
+use cryo_lexer::{
+    atoms::Minus,
+    literal::{IntegerLiteral as IToken, StringLiteral as SToken},
+    stream::StreamLike,
+};
 use itertools::Itertools;
 
-parse_error! {
-    /// Errors returned when parsing literals.
-    #(group)
-    pub enum LiteralError {
-        /// An error that may occur when parsing a string literal.
-        StringLiteralError(StringLiteralError),
-        /// An error that may occur when parsing an integer literal.
-        IntegerLiteralError(IntegerLiteralError),
-    }
-}
+use crate::Parse;
 
 /// A literal expression.
 ///
 /// View the module-level docs for more information.
-#[derive(Parse, Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Literal {
     /// An integer literal.
     IntegerLiteral(IntegerLiteral),
@@ -30,73 +22,69 @@ pub enum Literal {
     StringLiteral(StringLiteral),
 }
 
+impl Parse for Literal {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        tokens
+            .with(IntegerLiteral::parse)
+            .map(Self::IntegerLiteral)
+            .or_else(|_| tokens.with(StringLiteral::parse).map(Self::StringLiteral))
+    }
+}
+
 /// An integer literal.
 ///
 /// This is a wrapper around [`i32`] and therefore has the same properties as `i32`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct IntegerLiteral(pub i32);
-
-parse_error! {
-    /// Errors that may occur when parsing integer literals.
-    #(concrete, "integer parse literal error", 1)
-    pub enum IntegerLiteralError {
-        /// The given input would overflow if evaluated, since this type is constrained.
-        #(0, "integer overflow",)
-        Overflow,
-    }
+pub enum IntegerLiteral {
+    /// The value of this literal.
+    Value(i32),
+    /// The literal would have resulted in an overflow.
+    Overflow,
 }
 
 impl Parse for IntegerLiteral {
-    type Output = Self;
-
-    fn parse(
-        tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-    ) -> crate::parser::ParseResult<Self::Output> {
-        let token = tokens.advance_require::<IToken>()?;
-        let mut int = 0i32;
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
         let mut sgn = 1;
 
-        for c in token.0.chars() {
+        while tokens.advance_require::<Minus>().is_ok() {
+            sgn *= -1;
+        }
+
+        let int_token = tokens.advance_require::<IToken>()?;
+        let mut int = 0i32;
+        for c in int_token.0.chars() {
             if let '_' = c {
-                continue;
-            } else if let '-' = c {
-                sgn *= -1;
                 continue;
             }
 
             let digit = (c as u32).cast_signed() - 0x30;
-            int = int
-                .checked_mul(10)
-                .ok_or(Spanned::new(IntegerLiteralError::Overflow, token.span))?
-                .checked_add(digit)
-                .ok_or(Spanned::new(IntegerLiteralError::Overflow, token.span))?;
+            int = match int.checked_mul(10) {
+                Some(v) => v,
+                _ => return Ok(IntegerLiteral::Overflow),
+            };
+
+            int = match int.checked_add(digit) {
+                Some(v) => v,
+                _ => return Ok(IntegerLiteral::Overflow),
+            };
         }
 
-        Ok(Spanned::new(Self(int * sgn), token.span))
+        Ok(Self::Value(int * sgn))
     }
 }
 
 /// An unescaped string literal.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StringLiteral(pub String);
-
-parse_error! {
-    /// Errors that may occur when parsing a string literal.
-    #(concrete, "string literal parse error", 2)
-    pub enum StringLiteralError {
-        /// An invalid escape character was encountered.
-        #(0, "invalid escape {c}",)
-        InvalidEscape(c: char),
-    }
+pub enum StringLiteral {
+    /// The value of this literal.
+    Value(Box<str>),
+    /// The literal contained an invalid escape.
+    InvalidEscape(char),
 }
 
 impl Parse for StringLiteral {
-    type Output = Self;
-
     // TODO: add support for unicode escapes
-    fn parse(
-        tokens: &mut cryo_lexer::stream::TokenStreamGuard,
-    ) -> crate::parser::ParseResult<Self::Output> {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
         let token = tokens.advance_require::<SToken>()?;
         let mut buffer = String::with_capacity(token.0.len());
 
@@ -110,10 +98,7 @@ impl Parse for StringLiteral {
                     '0' => '\0',
                     '"' => '"',
                     esc => {
-                        return Err(Box::new(Spanned::new(
-                            StringLiteralError::InvalidEscape(esc),
-                            token.span,
-                        )));
+                        return Ok(StringLiteral::InvalidEscape(esc));
                     }
                 });
 
@@ -125,6 +110,85 @@ impl Parse for StringLiteral {
         }
         buffer.shrink_to_fit();
 
-        Ok(Spanned::new(Self(buffer), token.span))
+        Ok(Self::Value(buffer.into_boxed_str()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use cryo_lexer::{
+        Symbol, Token, TokenType,
+        atoms::Minus,
+        literal::{IntegerLiteral as IntLitToken, Literal as LitToken},
+        stream::TokenStream,
+    };
+    use cryo_span::{Span, Spanned};
+
+    use crate::{
+        expr::{
+            BaseExpr, Expr,
+            literal::{IntegerLiteral, Literal, StringLiteral},
+        },
+        test_util::assert_parse,
+    };
+
+    #[test]
+    fn parse_int_literal() {
+        assert_parse(
+            TokenStream::new([
+                Token::new(TokenType::Minus(Minus), Span::new(0, 1)),
+                Token::new(
+                    TokenType::Literal(LitToken::IntegerLiteral(IntLitToken(Symbol::new(
+                        "123_456",
+                    )))),
+                    Span::new(1, 8),
+                ),
+            ]),
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                    IntegerLiteral::Value(-123456),
+                ))),
+                Span::new(0, 8),
+            ),
+        );
+    }
+
+    #[test]
+    fn fail_parse_overflow() {
+        assert_parse(
+            "2147483648",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                    IntegerLiteral::Overflow,
+                ))),
+                Span::new(0, 10),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_str_lit() {
+        assert_parse(
+            "\"hello, world!\\n\"",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(StringLiteral::Value(
+                    Box::from("hello, world!\n"),
+                )))),
+                Span::new(0, 17),
+            ),
+        );
+    }
+
+    #[test]
+    fn fail_parse_str_lit_invalid_escape() {
+        assert_parse(
+            "\"hello, world\\x\"",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(
+                    StringLiteral::InvalidEscape('x'),
+                ))),
+                Span::new(0, 16),
+            ),
+        );
     }
 }

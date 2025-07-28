@@ -5,37 +5,36 @@
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    Error, FromToken, Lex, LexicalError, Sealed, Token, TokenType, extract, find_token_end,
+    Lex, LexicalError, LexicalErrorKind, Sealed, Symbol, Token, TokenLike, TokenType, extract,
+    find_token_end,
 };
 
 /// A literal. View the module-level docs for more information.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Literal<'source> {
+pub enum Literal {
     /// A string literal.
-    StringLiteral(StringLiteral<'source>),
+    StringLiteral(StringLiteral),
     /// An integer literal.
-    IntegerLiteral(IntegerLiteral<'source>),
-    /// A boolean literal.
-    BooleanLiteral(BooleanLiteral),
+    IntegerLiteral(IntegerLiteral),
 }
 
-token_marker!(Literal<'source>);
+token_marker!(Literal);
 
-impl<'source> Lex for Literal<'source> {
-    fn lex(s: &str) -> Result<(crate::Token, &str), Error> {
+impl Lex for Literal {
+    fn lex(s: &str) -> Result<(crate::Token, &str), LexicalError> {
         let first = s.chars().next();
         if let Some('"') = first {
             return StringLiteral::lex(s);
         }
 
-        if let Some('0'..='9' | '-') = first {
+        if let Some('0'..='9') = first {
             return IntegerLiteral::lex(s);
         }
 
-        let whitespace_pos = s.find(|c: char| c.is_whitespace()).unwrap_or(s.len());
-        Err(Error::new(
-            LexicalError::NoMatch,
-            Span::new(0, whitespace_pos),
+        let (start, _) = find_token_end(s);
+        Err(LexicalError::new(
+            LexicalErrorKind::NoMatch,
+            Span::new(0, start.len() as u32),
         ))
     }
 }
@@ -46,11 +45,10 @@ impl<'source> Lex for Literal<'source> {
 ///
 /// String literals are delimited by the token `"`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct StringLiteral<'source>(pub &'source str);
+pub struct StringLiteral(pub Symbol);
 
-impl<'s> FromToken<'s> for StringLiteral<'s> {
-    const NAME: &'static str = "StringLiteral";
-    fn from_token<'borrow>(token: &'borrow Token<'s>) -> Option<Spanned<&'borrow Self>> {
+impl TokenLike for StringLiteral {
+    fn from_token(token: &Token) -> Option<Spanned<&Self>> {
         let lit = Literal::from_token(token)?;
         match lit.t {
             Literal::StringLiteral(s) => Some(Spanned::new(s, lit.span)),
@@ -59,16 +57,26 @@ impl<'s> FromToken<'s> for StringLiteral<'s> {
     }
 }
 
-impl Sealed for StringLiteral<'_> {}
+impl Sealed for StringLiteral {}
 
-impl Lex for StringLiteral<'_> {
-    fn lex(s: &str) -> Result<(crate::Token, &str), crate::Error> {
+impl Lex for StringLiteral {
+    fn lex(s: &str) -> Result<(crate::Token, &str), crate::LexicalError> {
         let (token, rest) = find_token_end(s);
-        let span = Span::new(0, token.len());
+        let span = Span::new(0, token.len() as u32);
         let unquoted = match token.chars().next() {
             Some('"') => &s[1..],
-            Some(_) => return Err(Error::new(LexicalError::SequenceNotFound("\""), span)),
-            None => return Err(Error::new(LexicalError::EndOfInput, Span::new(0, 0))),
+            Some(_) => {
+                return Err(LexicalError::new(
+                    LexicalErrorKind::SequenceNotFound("\""),
+                    span,
+                ));
+            }
+            None => {
+                return Err(LexicalError::new(
+                    LexicalErrorKind::EndOfInput,
+                    Span::new(0, 0),
+                ));
+            }
         };
 
         let mut cursor = 0;
@@ -92,12 +100,17 @@ impl Lex for StringLiteral<'_> {
         }
 
         if !closed {
-            return Err(Error::new(LexicalError::SequenceNotFound("\""), span));
+            return Err(LexicalError::new(
+                LexicalErrorKind::SequenceNotFound("\""),
+                span,
+            ));
         }
 
         Ok((
             Token::new(
-                TokenType::Literal(Literal::StringLiteral(StringLiteral(&unquoted[..cursor]))),
+                TokenType::Literal(Literal::StringLiteral(StringLiteral(
+                    unquoted[..cursor].into(),
+                ))),
                 span,
             ),
             rest,
@@ -112,11 +125,10 @@ impl Lex for StringLiteral<'_> {
 /// Integer literals may not begin or end with a separator and may not contain negation signs anywhere but in the front.
 /// A variable number of both negation signs and separators are supported where they are valid.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct IntegerLiteral<'source>(pub &'source str);
+pub struct IntegerLiteral(pub Symbol);
 
-impl<'s> FromToken<'s> for IntegerLiteral<'s> {
-    const NAME: &'static str = "IntegerLiteral";
-    fn from_token<'borrow>(token: &'borrow Token<'s>) -> Option<Spanned<&'borrow Self>> {
+impl TokenLike for IntegerLiteral {
+    fn from_token(token: &Token) -> Option<Spanned<&Self>> {
         let lit = Literal::from_token(token)?;
         match lit.t {
             Literal::IntegerLiteral(s) => Some(Spanned::new(s, lit.span)),
@@ -125,69 +137,32 @@ impl<'s> FromToken<'s> for IntegerLiteral<'s> {
     }
 }
 
-impl Sealed for IntegerLiteral<'_> {}
+impl Sealed for IntegerLiteral {}
 
 fn is_invalid_integer_char(c: char) -> bool {
     !matches!(c, '0'..='9' | '_')
 }
 
-impl Lex for IntegerLiteral<'_> {
-    fn lex(s: &str) -> Result<(Token, &str), Error> {
-        let (neg, rest) = extract(s, |c| c != '-');
-        let (int, rest) = extract(rest, is_invalid_integer_char);
-        let total_len = neg.len() + int.len();
+impl Lex for IntegerLiteral {
+    fn lex(s: &str) -> Result<(Token, &str), LexicalError> {
+        let (int, rest) = extract(s, is_invalid_integer_char);
 
         if int.starts_with('_') || int.ends_with('_') {
-            return Err(Error::new(
-                LexicalError::InvalidSequence,
-                Span::new(0, total_len),
+            return Err(LexicalError::new(
+                LexicalErrorKind::InvalidSequence,
+                Span::new(0, int.len() as u32),
             ));
         }
 
         Ok((
             Token::new(
-                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(&s[..total_len]))),
-                Span::new(0, total_len),
+                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(
+                    s[..int.len()].into(),
+                ))),
+                Span::new(0, int.len() as u32),
             ),
             rest,
         ))
-    }
-}
-
-/// A boolean literal. Can be either `True` or `False`.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BooleanLiteral {
-    /// The `true` variant.
-    True,
-    /// The `false` variant.
-    False,
-}
-
-impl Lex for BooleanLiteral {
-    fn lex(s: &str) -> Result<(Token, &str), Error> {
-        let (token, rest) = find_token_end(s);
-        if token == "true" {
-            Ok((
-                Token::new(
-                    TokenType::Literal(Literal::BooleanLiteral(BooleanLiteral::True)),
-                    Span::new(0, 4),
-                ),
-                rest,
-            ))
-        } else if token == "false" {
-            Ok((
-                Token::new(
-                    TokenType::Literal(Literal::BooleanLiteral(BooleanLiteral::False)),
-                    Span::new(0, 5),
-                ),
-                rest,
-            ))
-        } else {
-            Err(Error::new(
-                LexicalError::SequenceNotFound("true | false"),
-                Span::new(0, token.len()),
-            ))
-        }
     }
 }
 
@@ -196,8 +171,8 @@ mod tests {
     use cryo_span::Span;
 
     use crate::{
-        Error, Lex, Token, TokenType,
-        literal::{BooleanLiteral, IntegerLiteral, Literal, StringLiteral},
+        Lex, LexicalError, Token, TokenType,
+        literal::{IntegerLiteral, Literal, StringLiteral},
     };
 
     #[test]
@@ -208,7 +183,7 @@ mod tests {
             StringLiteral::lex(input),
             Ok((
                 Token::new(
-                    TokenType::Literal(Literal::StringLiteral(StringLiteral("hello"))),
+                    TokenType::Literal(Literal::StringLiteral(StringLiteral("hello".into()))),
                     Span::new(0, 7)
                 ),
                 ""
@@ -223,7 +198,9 @@ mod tests {
             StringLiteral::lex(input),
             Ok((
                 Token::new(
-                    TokenType::Literal(Literal::StringLiteral(StringLiteral("hello, world\\n"))),
+                    TokenType::Literal(Literal::StringLiteral(StringLiteral(
+                        "hello, world\\n".into()
+                    ))),
                     Span::new(0, 16)
                 ),
                 ""
@@ -237,8 +214,8 @@ mod tests {
 
         assert_eq!(
             StringLiteral::lex(input),
-            Err(Error::new(
-                crate::LexicalError::SequenceNotFound("\""),
+            Err(LexicalError::new(
+                crate::LexicalErrorKind::SequenceNotFound("\""),
                 Span::new(0, 13)
             ))
         )
@@ -251,7 +228,7 @@ mod tests {
             IntegerLiteral::lex(input),
             Ok((
                 Token::new(
-                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input))),
+                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input.into()))),
                     Span::new(0, 6)
                 ),
                 ""
@@ -260,29 +237,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_int_lit_with_neg_sign() {
-        let input = "--123456";
-        assert_eq!(
-            IntegerLiteral::lex(input),
-            Ok((
-                Token::new(
-                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input))),
-                    Span::new(0, 8)
-                ),
-                ""
-            ))
-        )
-    }
-
-    #[test]
     fn parse_int_lit_with_separator() {
-        let input = "--123_456";
+        let input = "123_456";
         assert_eq!(
             IntegerLiteral::lex(input),
             Ok((
                 Token::new(
-                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input))),
-                    Span::new(0, 9)
+                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input.into()))),
+                    Span::new(0, 7)
                 ),
                 ""
             ))
@@ -294,8 +256,8 @@ mod tests {
         let input = "_123";
         assert_eq!(
             IntegerLiteral::lex(input),
-            Err(Error::new(
-                crate::LexicalError::InvalidSequence,
+            Err(LexicalError::new(
+                crate::LexicalErrorKind::InvalidSequence,
                 Span::new(0, 4)
             ))
         )
@@ -306,34 +268,9 @@ mod tests {
         let input = "123_";
         assert_eq!(
             IntegerLiteral::lex(input),
-            Err(Error::new(
-                crate::LexicalError::InvalidSequence,
+            Err(LexicalError::new(
+                crate::LexicalErrorKind::InvalidSequence,
                 Span::new(0, 4)
-            ))
-        )
-    }
-
-    #[test]
-    fn parse_bool_lit() {
-        assert_eq!(
-            BooleanLiteral::lex("true"),
-            Ok((
-                Token::new(
-                    TokenType::Literal(Literal::BooleanLiteral(BooleanLiteral::True)),
-                    Span::new(0, 4)
-                ),
-                ""
-            ))
-        );
-
-        assert_eq!(
-            BooleanLiteral::lex("false"),
-            Ok((
-                Token::new(
-                    TokenType::Literal(Literal::BooleanLiteral(BooleanLiteral::False)),
-                    Span::new(0, 5)
-                ),
-                ""
             ))
         )
     }

@@ -2,21 +2,20 @@
 //!
 //! A lexer will take an input and split the input into [`Token`]s comprehensible by the parser without modifying the inputs.
 
-#![feature(array_try_map)]
+#![feature(array_try_from_fn)]
 
 macro_rules! token_marker {
     (
-        $type:ident $(<$lt:tt>)?
+        $type:ident
     ) => {
-        impl<'source> $crate::Sealed for $type $(<$lt>)? {}
+        impl $crate::Sealed for $type {}
 
-        impl<'source> $crate::FromToken<'source> for $type $(<$lt>)? {
-            const NAME: &'static str = stringify!($type);
-            fn from_token<'borrow>(
-                token: &'borrow $crate::Token<'source>,
-            ) -> Option<::cryo_span::Spanned<&'borrow Self>> {
+        impl $crate::TokenLike for $type {
+            fn from_token(token: &$crate::Token) -> Option<::cryo_span::Spanned<&Self>> {
                 match token.t {
-                    $crate::TokenType::$type(ref v) => Some(::cryo_span::Spanned::new(v, token.span)),
+                    $crate::TokenType::$type(ref v) => {
+                        Some(::cryo_span::Spanned::new(v, token.span))
+                    }
                     _ => None,
                 }
             }
@@ -31,177 +30,47 @@ pub mod stream;
 
 use std::fmt::Display;
 
-use atoms::Visibility;
+use cryo_intern::InternStr;
 use cryo_span::{Span, Spanned};
 
 use crate::{
-    atoms::{Assign, Keyword, LCurly, Operators, RCurly, Semi},
+    atoms::{
+        Bang, Colon, Comma, Dot, Equal, LCurly, LParen, Minus, Percent, Plus, RCurly, RParen, Semi,
+        Slash, Star,
+    },
     identifier::Identifier,
     literal::Literal,
     stream::TokenStream,
 };
 
 /// A token. Contains a [`Span`] and a [`TokenType`].
-pub type Token<'source> = Spanned<TokenType<'source>>;
+pub type Token = Spanned<TokenType>;
 
 /// Extension trait for `Spanned<TokenType>` (a.k.a., [`Token`]).
-pub trait TokenExt<'source> {
+pub trait TokenExt {
     /// Attempt to reinterpret `self` as `T` using [`FromToken`].
-    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>>;
+    fn require<T: TokenLike>(&self) -> Option<Spanned<&T>>;
     /// Checks whether `self` can be reinterpreted as `T`.
-    fn is<T: FromToken<'source>>(&self) -> bool {
+    fn is<T: TokenLike>(&self) -> bool {
         self.require::<T>().is_some()
     }
 }
 
-impl<'source> TokenExt<'source> for Token<'source> {
-    fn require<T: FromToken<'source>>(&self) -> Option<Spanned<&T>> {
+impl TokenExt for Token {
+    #[track_caller]
+    fn require<T: TokenLike>(&self) -> Option<Spanned<&T>> {
         T::from_token(self)
     }
 }
 
-type LexFn = fn(&str) -> Result<(Token, &str), Error>;
-type Error = Spanned<LexicalError>;
+type LexFn = fn(&str) -> Result<(Token, &str), LexicalError>;
+/// An error returned by the lexer.
+pub type LexicalError = Spanned<LexicalErrorKind>;
 
-#[macro_export]
-#[doc(hidden)]
-macro_rules! atom {
-    (
-        $identifier:ident, $atom:expr
-    ) => {
-        impl $crate::Lex for $identifier {
-            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
-                let rest = s
-                    .strip_prefix($atom)
-                    .ok_or($crate::Error::new($crate::LexicalError::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len())))?;
-                Ok(($crate::Token::new($crate::TokenType::$identifier(Self), cryo_span::Span::new(0, $atom.len())), rest))
-            }
-        }
-
-        token_marker!($identifier);
-
-        #[cfg(test)]
-        ::paste::paste! {
-            #[test]
-            #[allow(non_snake_case)]
-            fn [<lex_ $identifier>]() {
-                use $crate::Lex;
-
-                assert_eq!(
-                    $identifier::lex($atom),
-                    Ok((
-                        $crate::Token::new(
-                            $crate::TokenType::$identifier($identifier),
-                            cryo_span::Span::new(0, $atom.len())
-                        ),
-                        ""
-                    ))
-                )
-            }
-        }
-    };
-
-
-    (
-        $(#[$attr:meta])*
-        $visibility:vis enum $identifier:ident {
-            $(
-                $(#[$variant_attr:meta])*
-                #($atom:expr)
-                $variant:ident
-            ),*
-        } with $constructor:path
-    ) => {
-        $(#[$attr])*
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        $visibility enum $identifier {
-            $(
-                $(#[$variant_attr])*
-                $variant,
-            )*
-        }
-
-        impl $identifier {
-            #[doc = concat!("The variants ", stringify!($identifier), " may have")]
-            $visibility const VARIANTS: &[Self] = &[$(
-                Self::$variant,
-            )*];
-
-            #[doc = concat!("Return the string this variant would be able to be parsed from")]
-            $visibility const fn as_str(&self) -> &str {
-                match self {
-                    $(
-                        Self::$variant => $atom,
-                    )*
-                }
-            }
-        }
-
-        impl $crate::Lex for $identifier {
-            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
-                for variant in Self::VARIANTS {
-                    let atom = variant.as_str();
-                    if let Some(v) = s.strip_prefix(variant.as_str()) {
-                        return Ok(($crate::Token::new($constructor(*variant), cryo_span::Span::new(0, atom.len())), v))
-                    }
-                }
-
-                let whitespace_pos = s.find(|c: char| c.is_whitespace()).unwrap_or(s.len());
-                Err($crate::Error::new($crate::LexicalError::SequenceNotFound(stringify!($identifier)), cryo_span::Span::new(0, whitespace_pos)))
-            }
-        }
-
-        token_marker!($identifier);
-
-        #[cfg(test)]
-        ::paste::paste! {
-            #[allow(non_snake_case)]
-            mod [<$identifier _tests>] {
-                use $crate::Lex;
-                $(
-                    #[test]
-                    #[allow(non_snake_case)]
-                    fn [<lex_ $identifier _ $variant>]() {
-                        assert_eq!(
-                            super::$identifier::lex(super::$identifier::$variant.as_str()),
-                            Ok((
-                                $crate::Token::new(
-                                    $constructor(
-                                        super::$identifier::$variant
-                                    ),
-                                    cryo_span::Span::new(0, super::$identifier::$variant.as_str().len())
-                                ),
-                                ""
-                            ))
-                        );
-                    }
-                )*
-            }
-        }
-    };
-
-    (
-        $(#[$attr:meta])*
-        $visibility:vis enum $identifier:ident {
-            $(
-                $(#[$variant_attr:meta])*
-                #($atom:expr)
-                $variant:ident
-            ),*
-        }
-    ) => {
-        $crate::atom!(
-            $(#[$attr])*
-            $visibility enum $identifier {
-                $(
-                    $(#[$variant_attr])*
-                    #($atom)
-                    $variant
-                ),*
-            } with $crate::TokenType::$identifier
-        );
-    };
-}
+/// A symbol.
+///
+/// A symbol represents an interned slice of input.
+pub type Symbol = InternStr;
 
 /// Split an input string while the supplied function returns `false`.
 pub fn extract(s: &str, f: impl Fn(char) -> bool) -> (&str, &str) {
@@ -230,72 +99,114 @@ pub(crate) fn find_token_end(s: &str) -> (&str, &str) {
 }
 
 trait Lex: Sized {
-    fn lex(s: &str) -> Result<(Token, &str), Error>;
+    fn lex(s: &str) -> Result<(Token, &str), LexicalError>;
 }
 
 /// The possible types a token may be. `'source` refers to the lifetime of the input given to the parser.
+// TODO: overflow subtypes into this to avoid nesting
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TokenType<'source> {
-    /// A keyword.
-    Keyword(Keyword),
+pub enum TokenType {
     /// An identifier.
-    Identifier(Identifier<'source>),
+    Identifier(Identifier),
+
     /// A literal.
-    Literal(Literal<'source>),
-    /// An arithmetic operator.
-    Operators(Operators),
-    /// An assign token (`=`).
-    Assign(Assign),
+    Literal(Literal),
+
     /// A semicolon (`;`).
     Semi(Semi),
+
+    /// A plus (`+`).
+    Plus(Plus),
+
+    /// A minus (`-`).
+    Minus(Minus),
+
+    /// A star (`*`).
+    Star(Star),
+
+    /// A slash (`/`).
+    Slash(Slash),
+
+    /// A percent sign (`%`).
+    Percent(Percent),
+
+    /// An equals sign (`=`).
+    Equal(Equal),
+
+    /// A bang (`!`).
+    Bang(Bang),
+
     /// The right curly brace ('{').
     RCurly(RCurly),
+
     /// The left curly brace ('}')
     LCurly(LCurly),
-    /// The visibility token.
-    Visibility(Visibility),
+
+    /// The left parenthesis (`(`).
+    LParen(LParen),
+
+    /// The right parenthesis (`)`).
+    RParen(RParen),
+
+    /// A comma.
+    Comma(Comma),
+
+    /// A colon.
+    Colon(Colon),
+
+    /// A dot.
+    Dot(Dot),
 }
 
 trait Sealed {}
 
 /// Trait for attempting to convert `Token`s into concrete types.
 #[allow(private_bounds)]
-pub trait FromToken<'source>: Sealed {
-    /// The name of the token.
-    const NAME: &'static str;
+pub trait TokenLike: Sealed {
     /// Attempt to convert a given token into `Self`.
-    fn from_token<'borrow>(token: &'borrow Token<'source>) -> Option<Spanned<&'borrow Self>>;
+    fn from_token(token: &Token) -> Option<Spanned<&Self>>;
 }
 
-impl<'s> TokenType<'s> {
+impl TokenType {
     // the order of these is important
-    const LEX_FUNCTIONS: &'static [LexFn] = &[
-        Keyword::lex,
+    const LEX_FUNCTIONS: &[LexFn] = &[
         Identifier::lex,
         Literal::lex,
-        Operators::lex,
-        Assign::lex,
+        Plus::lex,
+        Minus::lex,
+        Star::lex,
+        Slash::lex,
+        Percent::lex,
+        Bang::lex,
+        Equal::lex,
         Semi::lex,
         RCurly::lex,
         LCurly::lex,
+        Comma::lex,
+        LParen::lex,
+        RParen::lex,
+        Colon::lex,
+        Dot::lex,
     ];
 }
 
-impl Lex for TokenType<'_> {
-    fn lex(s: &str) -> Result<(Token, &str), Error> {
+impl Lex for TokenType {
+    fn lex(s: &str) -> Result<(Token, &str), LexicalError> {
         for f in Self::LEX_FUNCTIONS {
             if let Ok(v) = f(s) {
                 return Ok(v);
             }
         }
-
-        Err(Error::new(LexicalError::NoMatch, Span::new(0, s.len())))
+        Err(LexicalError::new(
+            LexicalErrorKind::NoMatch,
+            Span::new(0, s.len() as u32),
+        ))
     }
 }
 
 /// Errors that may occur during lexing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LexicalError {
+pub enum LexicalErrorKind {
     /// An expected sequence was not found.
     SequenceNotFound(&'static str),
     /// An invalid sequence was not found.
@@ -304,15 +215,18 @@ pub enum LexicalError {
     EndOfInput,
     /// The lexer could not convert the supplied input into any tokens.
     NoMatch,
+    /// No progress was made by the lexer.
+    NoProgress,
 }
 
-impl Display for LexicalError {
+impl Display for LexicalErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let e_str = match self {
             Self::SequenceNotFound(s) => format!("sequence not found: '{s}'"),
             Self::EndOfInput => "unexpected end of input".to_owned(),
             Self::NoMatch => "could not parse the given stream".to_owned(),
             Self::InvalidSequence => "invalid sequence".to_owned(),
+            Self::NoProgress => "the lexer could not make any progress".to_owned(),
         };
         write!(f, "lexical error: {e_str}")?;
 
@@ -324,7 +238,7 @@ impl Display for LexicalError {
 ///
 /// The function will attempt to convert the supplied input into tokens and return a [`TokenStream`] which can be used to inspect the tokens generated. \
 /// If it fails, the function will return a spanned [`LexicalError`] pointing to where the erroneous input is.
-pub fn lexer(input: &str) -> Result<TokenStream, Error> {
+pub fn lexer(input: &str) -> Result<TokenStream, LexicalError> {
     let mut tokens = vec![];
     let mut loop_input = input.trim();
     let mut cursor = input.len() - loop_input.len();
@@ -332,8 +246,12 @@ pub fn lexer(input: &str) -> Result<TokenStream, Error> {
     while !loop_input.is_empty() {
         let (mut token, rest) = TokenType::lex(loop_input)?;
 
+        if loop_input.len() == rest.len() {
+            return Err(LexicalError::zero(LexicalErrorKind::NoProgress));
+        }
+
         let token_len = loop_input.len() - rest.len();
-        token = token.offset(cursor);
+        token = token.offset(cursor as u32);
 
         tokens.push(token);
         cursor += token_len;
@@ -346,13 +264,21 @@ pub fn lexer(input: &str) -> Result<TokenStream, Error> {
     Ok(TokenStream::new(tokens))
 }
 
+impl TryInto<TokenStream> for &'_ str {
+    type Error = LexicalError;
+
+    fn try_into(self) -> Result<TokenStream, Self::Error> {
+        lexer(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use cryo_span::Span;
 
     use crate::{
         Token, TokenType,
-        atoms::{Assign, Keyword, Operators, Semi},
+        atoms::{Equal, Semi},
         identifier::Identifier,
         lexer,
         literal::{IntegerLiteral, Literal, StringLiteral},
@@ -363,21 +289,27 @@ mod tests {
         let input = "let input = 20 + \"hello\";";
 
         let expected = [
-            Token::new(TokenType::Keyword(Keyword::Let), Span::new(0, 3)),
-            Token::new(TokenType::Identifier(Identifier("input")), Span::new(4, 9)),
-            Token::new(TokenType::Assign(Assign), Span::new(10, 11)),
             Token::new(
-                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral("20"))),
+                TokenType::Identifier(Identifier("let".into())),
+                Span::new(0, 3),
+            ),
+            Token::new(
+                TokenType::Identifier(Identifier("input".into())),
+                Span::new(4, 9),
+            ),
+            Token::new(TokenType::Equal(Equal), Span::new(10, 11)),
+            Token::new(
+                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral("20".into()))),
                 Span::new(12, 14),
             ),
-            Token::new(TokenType::Operators(Operators::Add), Span::new(15, 16)),
+            Token::new(TokenType::Plus(crate::atoms::Plus), Span::new(15, 16)),
             Token::new(
-                TokenType::Literal(Literal::StringLiteral(StringLiteral("hello"))),
+                TokenType::Literal(Literal::StringLiteral(StringLiteral("hello".into()))),
                 Span::new(17, 24),
             ),
             Token::new(TokenType::Semi(Semi), Span::new(24, 25)),
         ];
 
-        assert_eq!(lexer(input).unwrap().inner, expected)
+        assert_eq!(&*lexer(input).unwrap().inner, expected)
     }
 }

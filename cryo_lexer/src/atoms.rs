@@ -2,122 +2,215 @@
 //!
 //! Atoms are tokens which are constant and only may be parsed from one specific input.
 
-use cryo_span::Span;
+#[doc(hidden)]
+macro_rules! atom {
+    (
+        $(#[$attr:meta])*
+        $identifier:ident  = $atom:expr
+    ) => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        $(#[$attr])*
+        pub struct $identifier;
 
-use crate::{Lex, LexicalError, Token, TokenType, atom, find_token_end};
-
-/// A semicolon token (`;`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Semi;
-
-/// An assign token (`=`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Assign;
-
-/// The left curly brace (`{`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct LCurly;
-
-/// The right curly brace (`}`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct RCurly;
-
-atom!(LCurly, "{");
-atom!(RCurly, "}");
-atom!(Semi, ";");
-atom!(Assign, "=");
-atom! {
-    /// A keyword.
-    ///
-    /// Keywords are reserved tokens used to indicate behaviour or declare constructs.
-    pub enum Keyword {
-        /// The `let` keyword. Used to declare bindings.
-        #("let")
-        Let,
-        /// The `mut` keyword. Used to declare mutability on bindings.
-        #("mut")
-        Mut,
-        /// The `if` keyword. Used to indicate a conditional block.
-        #("if")
-        If,
-        /// The `else` keyword. Used to define the operation to be executed should an if-statement not be valid.
-        #("else")
-        Else,
-        /// The `struct` keyword. Used to define structs.
-        #("struct")
-        Struct
-    }
-}
-
-atom! {
-    /// Operators for binary expressions.
-    pub enum Operators {
-        /// The addition operator (`+`).
-        #("+")
-        Add,
-        /// The subtraction operator (`-`).
-        #("-")
-        Sub,
-        /// The multiplication operator (`*`).
-        #("*")
-        Mul,
-        /// The division operator (`/`).
-        #("/")
-        Div,
-        /// The remainder operator (`%`).
-        #("%")
-        Rem,
-        /// The equality operator (`==`).
-        #("==")
-        Eq,
-        /// The inequality operator (`!=`).
-        #("!=")
-        NotEq
-    }
-}
-
-/// Item visibility token.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Visibility {
-    /// Private visibility.
-    Private,
-    /// Public visibility.
-    Public,
-}
-
-impl Lex for Visibility {
-    fn lex(s: &str) -> Result<(crate::Token, &str), crate::Error> {
-        let (token, rest) = find_token_end(s);
-
-        if let Ok((
-            Token {
-                t: TokenType::Keyword(Keyword::Struct),
-                ..
-            },
-            ..,
-        )) = Keyword::lex(rest)
-        {
-            return match token {
-                "" => Ok((
-                    Token::new(TokenType::Visibility(Visibility::Private), Span::new(0, 0)),
-                    rest,
-                )),
-                "pub" => Ok((
-                    Token::new(TokenType::Visibility(Visibility::Public), Span::new(0, 3)),
-                    rest,
-                )),
-                _ => Err(crate::Error::new(
-                    LexicalError::SequenceNotFound("pub | \"\""),
-                    Span::new(0, token.len()),
-                )),
-            };
+        impl $crate::Lex for $identifier {
+            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::LexicalError> {
+                let rest = s
+                    .strip_prefix($atom)
+                    .ok_or($crate::LexicalError::new($crate::LexicalErrorKind::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len() as u32)))?;
+                Ok(($crate::Token::new($crate::TokenType::$identifier(Self), cryo_span::Span::new(0, $atom.len() as u32)), rest))
+            }
         }
 
-        return Err(crate::Error::new(
-            LexicalError::SequenceNotFound("item keyword"),
-            Span::new(0, token.len()),
-        ));
-    }
+        token_marker!($identifier);
+
+        #[cfg(test)]
+        ::paste::paste! {
+            #[test]
+            #[allow(non_snake_case)]
+            fn [<lex_ $identifier>]() {
+                use $crate::Lex;
+
+                assert_eq!(
+                    $identifier::lex($atom),
+                    Ok((
+                        $crate::Token::new(
+                            $crate::TokenType::$identifier($identifier),
+                            cryo_span::Span::new(0, $atom.len() as u32)
+                        ),
+                        ""
+                    ))
+                )
+            }
+        }
+    };
+
+
+    (
+        $(#[$attr:meta])*
+        $visibility:vis enum $identifier:ident {
+            $(
+                $(#[$variant_attr:meta])*
+                #($atom:expr)
+                $variant:ident
+            ),*
+        } with $constructor:path
+    ) => {
+        $(#[$attr])*
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        $visibility enum $identifier {
+            $(
+                $(#[$variant_attr])*
+                $variant,
+            )*
+        }
+
+        impl $identifier {
+            #[doc = concat!("The variants ", stringify!($identifier), " may have")]
+            $visibility const VARIANTS: &[Self] = &[$(
+                Self::$variant,
+            )*];
+
+            #[doc = concat!("Return the string this variant would be able to be parsed from")]
+            $visibility const fn as_str(&self) -> &str {
+                match self {
+                    $(
+                        Self::$variant => $atom,
+                    )*
+                }
+            }
+        }
+
+        impl $crate::Lex for $identifier {
+            fn lex(s: &str) -> Result<($crate::Token, &str), $crate::Error> {
+                for variant in Self::VARIANTS {
+                    let atom = variant.as_str();
+                    if let Some(v) = s.strip_prefix(variant.as_str()) {
+                        return Ok(($crate::Token::new($constructor(*variant), cryo_span::Span::new(0, atom.len() as u32)), v))
+                    }
+                }
+
+                let (start, _) = $crate::find_token_end(s);
+                Err($crate::Error::new($crate::LexicalError::SequenceNotFound(stringify!($identifier)), cryo_span::Span::new(0, start.len() as u32)))
+            }
+        }
+
+        token_marker!($identifier);
+
+        #[cfg(test)]
+        ::paste::paste! {
+            #[allow(non_snake_case)]
+            mod [<$identifier _tests>] {
+                use $crate::Lex;
+                $(
+                    #[test]
+                    #[allow(non_snake_case)]
+                    fn [<lex_ $identifier _ $variant>]() {
+                        assert_eq!(
+                            $crate::TokenType::lex(super::$identifier::$variant.as_str()),
+                            Ok((
+                                $crate::Token::new(
+                                    $constructor(
+                                        super::$identifier::$variant
+                                    ),
+                                    cryo_span::Span::new(0, super::$identifier::$variant.as_str().len() as u32)
+                                ),
+                                ""
+                            ))
+                        );
+                    }
+                )*
+            }
+        }
+    };
+
+    (
+        $(#[$attr:meta])*
+        $visibility:vis enum $identifier:ident {
+            $(
+                $(#[$variant_attr:meta])*
+                #($atom:expr)
+                $variant:ident
+            ),*
+        }
+    ) => {
+        atom!(
+            $(#[$attr])*
+            $visibility enum $identifier {
+                $(
+                    $(#[$variant_attr])*
+                    #($atom)
+                    $variant
+                ),*
+            } with $crate::TokenType::$identifier
+        );
+    };
 }
 
-token_marker!(Visibility);
+atom!(
+    /// The left curly parenthesis.
+    LCurly = "{"
+);
+atom!(
+    /// The right curly parenthesis.
+    RCurly = "}"
+);
+atom!(
+    /// The left parenthesis.
+    LParen = "("
+);
+atom!(
+    /// The right parenthesis.
+    RParen = ")"
+);
+atom!(
+    /// A semicolon.
+    Semi = ";"
+);
+atom!(
+    /// A comma.
+    Comma = ","
+);
+atom!(
+    /// A colon.
+    Colon = ":"
+);
+
+atom!(
+    /// A dot.
+    Dot = "."
+);
+
+atom!(
+    /// `+`.
+    Plus = "+"
+);
+
+atom!(
+    /// `-`.
+    Minus = "-"
+);
+
+atom!(
+    /// `*`.
+    Star = "*"
+);
+
+atom!(
+    /// `/`.
+    Slash = "/"
+);
+
+atom!(
+    /// `%`.
+    Percent = "%"
+);
+
+atom!(
+    /// `=`.
+    Equal = "="
+);
+
+atom!(
+    /// `!`.
+    Bang = "!"
+);
