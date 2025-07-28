@@ -71,6 +71,12 @@ impl PartialEq for InternStr {
     }
 }
 
+impl PartialEq<str> for InternStr {
+    fn eq(&self, other: &str) -> bool {
+        Deref::deref(self).eq(other)
+    }
+}
+
 impl Eq for InternStr {}
 
 impl Hash for InternStr {
@@ -109,7 +115,14 @@ impl From<&'_ str> for InternStr {
 
 impl std::fmt::Debug for InternStr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("InternStr").field("ptr", &self.ptr).finish()
+        let alternate = f.alternate();
+        let mut debug_struct = f.debug_struct("InternStr");
+        match alternate {
+            true => debug_struct.field("inner", &Deref::deref(self)),
+            false => debug_struct.field("ptr", &self.ptr),
+        };
+
+        debug_struct.finish()
     }
 }
 

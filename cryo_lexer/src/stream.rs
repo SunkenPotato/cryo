@@ -11,7 +11,7 @@ pub use guard::Guard;
 
 /// A token stream.
 ///
-/// Token streams cannot be created manually, only through the lexer.
+/// Token streams should not be created manually, only through the lexer.
 ///
 /// To interact with a token stream, create a guard with [`StreamLike::with`] or obtain a non-tracking reference with [`TokenStream::non_tracking`].
 #[derive(Clone)]

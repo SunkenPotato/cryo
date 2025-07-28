@@ -8,11 +8,15 @@
 pub mod atoms;
 pub mod expr;
 pub mod ident;
+pub mod stmt;
 
 #[cfg(test)]
 mod test_util;
 
-use cryo_lexer::stream::{Guard, StreamLike, TokenStream, TokenStreamError};
+use cryo_lexer::{
+    Symbol,
+    stream::{Guard, StreamLike, TokenStream, TokenStreamError},
+};
 use cryo_span::{Span, Spanned};
 use derive_more::From;
 
@@ -23,6 +27,8 @@ type ParseResult<T> = Result<T, ParseError>;
 pub enum ParseError {
     /// The token stream returned an error.
     TokenStreamError(TokenStreamError),
+    /// A keyword is missing.
+    MissingKw(Symbol),
 }
 
 trait Parse: Sized {

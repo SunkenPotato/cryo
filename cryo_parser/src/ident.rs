@@ -1,5 +1,7 @@
 //! Identifiers.
 
+use std::thread::LocalKey;
+
 use cryo_lexer::{Symbol, identifier::Identifier};
 
 use crate::Parse;
@@ -23,13 +25,42 @@ keywords! {
     MUT = mut
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 /// A validated identifier, that is, one proven not to be a keyword.
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Ident {
     /// The actual identifier.
     pub sym: Symbol,
     /// Represents whether this identifier is valid or not.
     pub valid: bool,
+}
+
+trait IdentEq<'a> {
+    fn ieq(&'a self, sym: &Symbol) -> bool;
+}
+
+impl IdentEq<'_> for Symbol {
+    fn ieq(&'_ self, sym: &Symbol) -> bool {
+        self.eq(sym)
+    }
+}
+
+impl IdentEq<'_> for str {
+    fn ieq(&'_ self, sym: &Symbol) -> bool {
+        sym.eq(self)
+    }
+}
+
+impl IdentEq<'static> for LocalKey<Symbol> {
+    fn ieq(&'static self, sym: &Symbol) -> bool {
+        self.with(|v| v.eq(sym))
+    }
+}
+
+impl Ident {
+    /// Require this identifier to be equal to the value specified. This is mainly a convenience method for comparisons to `LocalKey<Symbol>`.
+    pub fn require<'a>(self, v: &'a impl IdentEq<'a>) -> Result<Self, Self> {
+        v.ieq(&self.sym).then_some(self).ok_or(self)
+    }
 }
 
 impl Parse for Ident {
