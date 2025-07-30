@@ -165,8 +165,10 @@ pub enum BaseExpr {
 /// A block expression, i.e., a series of statements and a final optional tail expression surrounded by `{` and `}`.
 #[derive(Debug, PartialEq, Eq)]
 pub struct BlockExpr {
-    stmts: Box<[Stmt]>,
-    tail: Option<Box<Expr>>,
+    /// The statements this expression contains.
+    pub stmts: Box<[Stmt]>,
+    /// The final expression, which this evaluates to.
+    pub tail: Option<Box<Expr>>,
 }
 
 impl Parse for BlockExpr {
@@ -271,7 +273,7 @@ mod tests {
             literal::{IntegerLiteral, Literal},
         },
         ident::Ident,
-        stmt::{Binding, Stmt},
+        stmt::{Binding, Stmt, TypedIdent},
         test_util::assert_parse,
     };
 
@@ -432,14 +434,20 @@ mod tests {
     #[test]
     fn parse_stmts_tail_block() {
         assert_parse(
-            "{ let x = 5; x }",
+            "{ let x: int = 5; x }",
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::BlockExpr(BlockExpr {
                     stmts: Box::new([Stmt::Binding(Binding {
                         mutability: None,
-                        ident: Ident {
-                            sym: Symbol::new("x"),
-                            valid: true,
+                        ident: TypedIdent {
+                            ident: Ident {
+                                sym: Symbol::new("x"),
+                                valid: true,
+                            },
+                            id_ty: Ident {
+                                sym: Symbol::new("int"),
+                                valid: true,
+                            },
                         },
                         expr: Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
                             IntegerLiteral::Value(5),
@@ -450,7 +458,7 @@ mod tests {
                         valid: true,
                     })))),
                 })),
-                Span::new(0, 16),
+                Span::new(0, 21),
             ),
         )
     }

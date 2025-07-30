@@ -24,7 +24,8 @@ keywords! {
     LET = let,
     MUT = mut,
     IF = if,
-    ELSE = else
+    ELSE = else,
+    FUN = fun
 }
 
 /// A validated identifier, that is, one proven not to be a keyword.

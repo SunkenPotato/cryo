@@ -8,6 +8,7 @@
 pub mod atoms;
 pub mod expr;
 pub mod ident;
+pub mod item;
 pub mod stmt;
 
 #[cfg(test)]
@@ -48,6 +49,7 @@ impl<T: Parse> Parse for Vec<T> {
 }
 
 /// A series of `T` punctuated by `P`. The last `T` does not have to be followed by `P`, in which case the `inner` field will be empty and the `T` will be stored in `last`.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Punctuated<T, P> {
     /// The series of `T` followed by `P`.
     pub inner: Vec<(T, P)>,
