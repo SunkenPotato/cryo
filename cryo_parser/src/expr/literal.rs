@@ -7,6 +7,7 @@ use cryo_lexer::{
     literal::{IntegerLiteral as IToken, StringLiteral as SToken},
     stream::StreamLike,
 };
+use cryo_span::Spanned;
 use itertools::Itertools;
 
 use crate::Parse;
@@ -17,17 +18,21 @@ use crate::Parse;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Literal {
     /// An integer literal.
-    IntegerLiteral(IntegerLiteral),
+    IntegerLiteral(Spanned<IntegerLiteral>),
     /// A string literal.
-    StringLiteral(StringLiteral),
+    StringLiteral(Spanned<StringLiteral>),
 }
 
 impl Parse for Literal {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
         tokens
-            .with(IntegerLiteral::parse)
+            .spanning(IntegerLiteral::parse)
             .map(Self::IntegerLiteral)
-            .or_else(|_| tokens.with(StringLiteral::parse).map(Self::StringLiteral))
+            .or_else(|_| {
+                tokens
+                    .spanning(StringLiteral::parse)
+                    .map(Self::StringLiteral)
+            })
     }
 }
 
@@ -145,9 +150,10 @@ mod tests {
                 ),
             ]),
             Spanned::new(
-                Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(Spanned::new(
                     IntegerLiteral::Value(-123456),
-                ))),
+                    Span::new(0, 8),
+                )))),
                 Span::new(0, 8),
             ),
         );
@@ -158,9 +164,10 @@ mod tests {
         assert_parse(
             "2147483648",
             Spanned::new(
-                Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(Spanned::new(
                     IntegerLiteral::Overflow,
-                ))),
+                    Span::new(0, 10),
+                )))),
                 Span::new(0, 10),
             ),
         );
@@ -171,8 +178,9 @@ mod tests {
         assert_parse(
             "\"hello, world!\\n\"",
             Spanned::new(
-                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(StringLiteral::Value(
-                    Box::from("hello, world!\n"),
+                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(Spanned::new(
+                    StringLiteral::Value(Box::from("hello, world!\n")),
+                    Span::new(0, 17),
                 )))),
                 Span::new(0, 17),
             ),
@@ -184,9 +192,10 @@ mod tests {
         assert_parse(
             "\"hello, world\\x\"",
             Spanned::new(
-                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(
+                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(Spanned::new(
                     StringLiteral::InvalidEscape('x'),
-                ))),
+                    Span::new(0, 16),
+                )))),
                 Span::new(0, 16),
             ),
         );

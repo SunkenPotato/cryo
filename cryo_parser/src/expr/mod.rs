@@ -10,6 +10,7 @@ use cryo_lexer::{
     identifier::Identifier,
     stream::{Guard, StreamLike},
 };
+use cryo_span::Spanned;
 
 use crate::{
     Parse, ParseError,
@@ -41,7 +42,8 @@ pub enum Operator {
 
 impl Operator {
     fn parse_1<const CONSUME: bool>(tokens: &mut Guard) -> crate::ParseResult<Self> {
-        let op = match tokens.peek()?.t {
+        let peek_token = tokens.peek()?;
+        let op = match peek_token.t {
             TokenType::Plus(_) => Operator::Add,
             TokenType::Minus(_) => Operator::Sub,
             TokenType::Star(_) => Operator::Mul,
@@ -65,9 +67,9 @@ impl Operator {
                 }
                 Operator::NotEq
             }
-            t => {
+            _ => {
                 return Err(crate::ParseError::TokenStreamError(
-                    cryo_lexer::stream::TokenStreamError::IncorrectToken(t),
+                    cryo_lexer::stream::TokenStreamError::IncorrectToken(*peek_token),
                 ));
             }
         };
@@ -103,7 +105,7 @@ pub struct BinaryExpr {
     /// The left-hand side of this expression.
     pub lhs: Box<Expr>,
     /// The operator.
-    pub op: Operator,
+    pub op: Spanned<Operator>,
     /// The right-hand side of this expression.
     pub rhs: Box<Expr>,
 }
@@ -126,7 +128,7 @@ impl Expr {
                 break;
             }
 
-            tokens.with(Operator::parse).expect(
+            let op = tokens.spanning(Operator::parse).expect(
                 "operator should parse correctly since operator token has already been consumed",
             );
 
@@ -166,7 +168,7 @@ pub enum BaseExpr {
 #[derive(Debug, PartialEq, Eq)]
 pub struct BlockExpr {
     /// The statements this expression contains.
-    pub stmts: Box<[Stmt]>,
+    pub stmts: Box<[Spanned<Stmt>]>,
     /// The final expression, which this evaluates to.
     pub tail: Option<Box<Expr>>,
 }
@@ -203,7 +205,7 @@ impl Parse for CondExpr {
             && let Ok(_) = ident.require(&ELSE)
         {
             if let Ok(possible_if_token) = tokens.peek_require::<Identifier>()
-                && let Ok(_) = Ident::from(*possible_if_token.t).require(&IF)
+                && let Ok(_) = Ident::from(possible_if_token).require(&IF)
             {
                 let Ok(else_if_block) = tokens.with(IfBlock::parse) else {
                     break;
@@ -241,7 +243,7 @@ impl Parse for IfBlock {
         tokens
             .with(Ident::parse)?
             .require(&IF)
-            .map_err(|_| ParseError::MissingKw(IF.with(Clone::clone)))?;
+            .map_err(|v| ParseError::MissingKw(v.sym.map(|_| IF.with(Clone::clone))))?;
 
         let cond = Box::new(tokens.with(Expr::parse)?);
         let block = tokens.with(BlockExpr::parse)?;
@@ -286,11 +288,11 @@ mod tests {
             Spanned::new(
                 Expr::BinaryExpr(BinaryExpr {
                     lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                        IntegerLiteral::Value(5),
+                        Spanned::new(IntegerLiteral::Value(5), Span::new(0, 1)),
                     )))),
-                    op: super::Operator::Add,
+                    op: Spanned::new(super::Operator::Add, Span::new(2, 3)),
                     rhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                        IntegerLiteral::Value(6),
+                        Spanned::new(IntegerLiteral::Value(6), Span::new(4, 5)),
                     )))),
                 }),
                 Span::new(0, 5),
@@ -306,16 +308,16 @@ mod tests {
             Spanned::new(
                 Expr::BinaryExpr(BinaryExpr {
                     lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                        IntegerLiteral::Value(5),
+                        Spanned::new(IntegerLiteral::Value(5), Span::new(0, 1)),
                     )))),
-                    op: Operator::Add,
+                    op: Spanned::new(Operator::Add, Span::new(2, 3)),
                     rhs: Box::new(Expr::BinaryExpr(BinaryExpr {
                         lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(6),
+                            Spanned::new(IntegerLiteral::Value(6), Span::new(4, 5)),
                         )))),
-                        op: Operator::Mul,
+                        op: Spanned::new(Operator::Mul, Span::new(6, 7)),
                         rhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(2),
+                            Spanned::new(IntegerLiteral::Value(2), Span::new(8, 9)),
                         )))),
                     })),
                 }),
@@ -334,16 +336,16 @@ mod tests {
                 Expr::BinaryExpr(BinaryExpr {
                     lhs: Box::new(Expr::BinaryExpr(BinaryExpr {
                         lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(6),
+                            Spanned::new(IntegerLiteral::Value(6), Span::new(0, 1)),
                         )))),
-                        op: super::Operator::Mul,
+                        op: Spanned::new(super::Operator::Mul, Span::new(2, 3)),
                         rhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(2),
+                            Spanned::new(IntegerLiteral::Value(2), Span::new(4, 5)),
                         )))),
                     })),
-                    op: Operator::Add,
+                    op: Spanned::new(Operator::Add, Span::new(6, 7)),
                     rhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                        IntegerLiteral::Value(5),
+                        Spanned::new(IntegerLiteral::Value(5), Span::new(8, 9)),
                     )))),
                 }),
                 Span::new(0, 9),
@@ -359,33 +361,33 @@ mod tests {
                 Expr::BinaryExpr(BinaryExpr {
                     lhs: Box::new(Expr::BinaryExpr(BinaryExpr {
                         lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(2),
+                            Spanned::new(IntegerLiteral::Value(2), Span::new(0, 1)),
                         )))),
-                        op: Operator::Add,
+                        op: Spanned::new(Operator::Add, Span::new(2, 3)),
                         rhs: Box::new(Expr::BinaryExpr(BinaryExpr {
                             lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                                IntegerLiteral::Value(3),
+                                Spanned::new(IntegerLiteral::Value(3), Span::new(4, 5)),
                             )))),
-                            op: Operator::Mul,
+                            op: Spanned::new(Operator::Mul, Span::new(6, 7)),
                             rhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                                IntegerLiteral::Value(4),
+                                Spanned::new(IntegerLiteral::Value(4), Span::new(8, 9)),
                             )))),
                         })),
                     })),
-                    op: Operator::Eq,
+                    op: Spanned::new(Operator::Eq, Span::new(10, 12)),
                     rhs: Box::new(Expr::BinaryExpr(BinaryExpr {
                         lhs: Box::new(Expr::BinaryExpr(BinaryExpr {
                             lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                                IntegerLiteral::Value(6),
+                                Spanned::new(IntegerLiteral::Value(6), Span::new(13, 14)),
                             )))),
-                            op: Operator::Div,
+                            op: Spanned::new(Operator::Div, Span::new(15, 16)),
                             rhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                                IntegerLiteral::Value(2),
+                                Spanned::new(IntegerLiteral::Value(2), Span::new(17, 18)),
                             )))),
                         })),
-                        op: Operator::Sub,
+                        op: Spanned::new(Operator::Sub, Span::new(19, 20)),
                         rhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(2),
+                            Spanned::new(IntegerLiteral::Value(2), Span::new(21, 22)),
                         )))),
                     })),
                 }),
@@ -401,12 +403,18 @@ mod tests {
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::BlockExpr(BlockExpr {
                     stmts: Box::new([
-                        Stmt::ExprSemi(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(5),
-                        )))),
-                        Stmt::ExprSemi(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(7),
-                        )))),
+                        Spanned::new(
+                            Stmt::ExprSemi(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                                Spanned::new(IntegerLiteral::Value(5), Span::new(2, 3)),
+                            )))),
+                            Span::new(2, 4),
+                        ),
+                        Spanned::new(
+                            Stmt::ExprSemi(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                                Spanned::new(IntegerLiteral::Value(7), Span::new(5, 6)),
+                            )))),
+                            Span::new(5, 7),
+                        ),
                     ]),
                     tail: None,
                 })),
@@ -423,7 +431,10 @@ mod tests {
                 Expr::BaseExpr(BaseExpr::BlockExpr(BlockExpr {
                     stmts: Box::new([]),
                     tail: Some(Box::new(Expr::BaseExpr(BaseExpr::Lit(
-                        Literal::IntegerLiteral(IntegerLiteral::Value(5)),
+                        Literal::IntegerLiteral(Spanned::new(
+                            IntegerLiteral::Value(5),
+                            Span::new(2, 3),
+                        )),
                     )))),
                 })),
                 Span::new(0, 5),
@@ -437,24 +448,27 @@ mod tests {
             "{ let x: int = 5; x }",
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::BlockExpr(BlockExpr {
-                    stmts: Box::new([Stmt::Binding(Binding {
-                        mutability: None,
-                        ident: TypedIdent {
-                            ident: Ident {
-                                sym: Symbol::new("x"),
-                                valid: true,
+                    stmts: Box::new([Spanned::new(
+                        Stmt::Binding(Binding {
+                            mutability: None,
+                            ident: TypedIdent {
+                                ident: Ident {
+                                    sym: Spanned::new(Symbol::new("x"), Span::new(6, 7)),
+                                    valid: true,
+                                },
+                                id_ty: Ident {
+                                    sym: Spanned::new(Symbol::new("int"), Span::new(9, 12)),
+                                    valid: true,
+                                },
                             },
-                            id_ty: Ident {
-                                sym: Symbol::new("int"),
-                                valid: true,
-                            },
-                        },
-                        expr: Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(5),
-                        ))),
-                    })]),
+                            expr: Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                                Spanned::new(IntegerLiteral::Value(5), Span::new(15, 16)),
+                            ))),
+                        }),
+                        Span::new(2, 17),
+                    )]),
                     tail: Some(Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                        sym: Symbol::new("x"),
+                        sym: Spanned::new(Symbol::new("x"), Span::new(18, 19)),
                         valid: true,
                     })))),
                 })),
@@ -471,7 +485,7 @@ mod tests {
                 Expr::BaseExpr(BaseExpr::CondExpr(CondExpr {
                     if_block: IfBlock {
                         cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Symbol::new("f"),
+                            sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
                             valid: true,
                         }))),
                         block: BlockExpr {
@@ -495,7 +509,7 @@ mod tests {
                 Expr::BaseExpr(BaseExpr::CondExpr(CondExpr {
                     if_block: IfBlock {
                         cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Symbol::new("f"),
+                            sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
                             valid: true,
                         }))),
                         block: BlockExpr {
@@ -505,7 +519,7 @@ mod tests {
                     },
                     else_if_blocks: Box::new([IfBlock {
                         cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Symbol::new("g"),
+                            sym: Spanned::new(Symbol::new("g"), Span::new(16, 17)),
                             valid: true,
                         }))),
                         block: BlockExpr {
@@ -528,7 +542,7 @@ mod tests {
                 Expr::BaseExpr(BaseExpr::CondExpr(CondExpr {
                     if_block: IfBlock {
                         cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Symbol::new("f"),
+                            sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
                             valid: true,
                         }))),
                         block: BlockExpr {
@@ -538,7 +552,7 @@ mod tests {
                     },
                     else_if_blocks: Box::new([IfBlock {
                         cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Symbol::new("g"),
+                            sym: Spanned::new(Symbol::new("g"), Span::new(16, 17)),
                             valid: true,
                         }))),
                         block: BlockExpr {

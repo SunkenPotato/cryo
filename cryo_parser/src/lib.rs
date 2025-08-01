@@ -18,10 +18,11 @@ use cryo_lexer::{
     Symbol,
     stream::{Guard, StreamLike, TokenStream, TokenStreamError},
 };
-use cryo_span::{Span, Spanned};
+use cryo_span::Spanned;
 use derive_more::From;
 
 type ParseResult<T> = Result<T, ParseError>;
+type SpannedParseResult<T> = Result<Spanned<T>, ParseError>;
 
 /// Fatal errors that can occur when parsing.
 #[derive(From, Debug, PartialEq, Eq)]
@@ -29,18 +30,18 @@ pub enum ParseError {
     /// The token stream returned an error.
     TokenStreamError(TokenStreamError),
     /// A keyword is missing.
-    MissingKw(Symbol),
+    MissingKw(Spanned<Symbol>),
 }
 
 trait Parse: Sized {
     fn parse(tokens: &mut Guard) -> ParseResult<Self>;
 }
 
-impl<T: Parse> Parse for Vec<T> {
-    fn parse(tokens: &mut Guard) -> ParseResult<Self> {
+impl<T: Parse> Parse for Vec<Spanned<T>> {
+    fn parse(parser: &mut Guard) -> ParseResult<Self> {
         let mut buf = vec![];
 
-        while let Ok(v) = tokens.with(T::parse) {
+        while let Ok(v) = parser.spanning(T::parse) {
             buf.push(v);
         }
 
@@ -52,9 +53,9 @@ impl<T: Parse> Parse for Vec<T> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Punctuated<T, P> {
     /// The series of `T` followed by `P`.
-    pub inner: Vec<(T, P)>,
+    pub inner: Vec<(Spanned<T>, Spanned<P>)>,
     /// The last `T`, which does not have to be followed by a `P`. If it were followed by `P`, it would be stored in `inner`.
-    pub last: Option<Box<T>>,
+    pub last: Option<Box<Spanned<T>>>,
 }
 
 impl<T: Parse, P: Parse> Parse for Punctuated<T, P> {
@@ -62,8 +63,8 @@ impl<T: Parse, P: Parse> Parse for Punctuated<T, P> {
         let mut inner = vec![];
         let mut last = None;
 
-        while let Ok(t) = tokens.with(T::parse) {
-            match tokens.with(P::parse) {
+        while let Ok(t) = tokens.spanning(T::parse) {
+            match tokens.spanning(P::parse) {
                 Ok(p) => inner.push((t, p)),
                 Err(_) => {
                     last.replace(Box::new(t));
@@ -77,30 +78,14 @@ impl<T: Parse, P: Parse> Parse for Punctuated<T, P> {
 }
 
 /// Parse a `T` from a stream or a guard.
-pub fn parse<T>(stream: &mut impl StreamLike) -> ParseResult<T>
+pub fn parse<T>(stream: &mut impl StreamLike) -> SpannedParseResult<T>
 where
     T: Parse,
 {
-    stream.with(T::parse)
+    stream.spanning(T::parse)
 }
 
 /// The parser.
 pub struct Parser {
     stream: TokenStream,
-}
-
-impl Parser {
-    /// Parse a `T`, except that the parser will span the result according to the tokens that the parsing function consumed.
-    pub fn spanning<T>(&mut self) -> Result<Spanned<T>, ParseError>
-    where
-        T: Parse,
-    {
-        let cursor_before = self.stream.cursor();
-        let result = self.stream.with(T::parse)?;
-        let final_span = self.stream.all()[cursor_before..self.stream.cursor()]
-            .iter()
-            .fold(Span::ZERO, |b, token| b + token.span);
-
-        Ok(Spanned::new(result, final_span))
-    }
 }

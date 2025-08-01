@@ -33,7 +33,7 @@ impl Parse for FnDef {
         tokens
             .with(Ident::parse)?
             .require(&FUN)
-            .map_err(|_| ParseError::MissingKw(FUN.with(Clone::clone)))?;
+            .map_err(|v| ParseError::MissingKw(v.sym.map(|_| FUN.with(Clone::clone))))?;
 
         let ident = tokens.with(Ident::parse)?;
         tokens.advance_require::<LParen>()?;
@@ -77,48 +77,54 @@ mod tests {
             Spanned::new(
                 FnDef {
                     ident: Ident {
-                        sym: Symbol::new("add"),
+                        sym: Spanned::new(Symbol::new("add"), Span::new(4, 7)),
                         valid: true,
                     },
                     args: Punctuated {
                         inner: vec![(
+                            Spanned::new(
+                                TypedIdent {
+                                    ident: Ident {
+                                        sym: Spanned::new(Symbol::new("lhs"), Span::new(8, 11)),
+                                        valid: true,
+                                    },
+                                    id_ty: Ident {
+                                        sym: Spanned::new(Symbol::new("int"), Span::new(13, 16)),
+                                        valid: true,
+                                    },
+                                },
+                                Span::new(8, 16),
+                            ),
+                            Spanned::new(Comma, Span::new(16, 17)),
+                        )],
+                        last: Some(Box::new(Spanned::new(
                             TypedIdent {
                                 ident: Ident {
-                                    sym: Symbol::new("lhs"),
+                                    sym: Spanned::new(Symbol::new("rhs"), Span::new(18, 21)),
                                     valid: true,
                                 },
                                 id_ty: Ident {
-                                    sym: Symbol::new("int"),
+                                    sym: Spanned::new(Symbol::new("int"), Span::new(23, 26)),
                                     valid: true,
                                 },
                             },
-                            Comma,
-                        )],
-                        last: Some(Box::new(TypedIdent {
-                            ident: Ident {
-                                sym: Symbol::new("rhs"),
-                                valid: true,
-                            },
-                            id_ty: Ident {
-                                sym: Symbol::new("int"),
-                                valid: true,
-                            },
-                        })),
+                            Span::new(18, 26),
+                        ))),
                     },
                     ret_ty: Some(Ident {
-                        sym: Symbol::new("int"),
+                        sym: Spanned::new(Symbol::new("int"), Span::new(29, 32)),
                         valid: true,
                     }),
                     body: BlockExpr {
                         stmts: Box::new([]),
                         tail: Some(Box::new(Expr::BinaryExpr(BinaryExpr {
                             lhs: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                sym: Symbol::new("lhs"),
+                                sym: Spanned::new(Symbol::new("lhs"), Span::new(35, 38)),
                                 valid: true,
                             }))),
-                            op: crate::expr::Operator::Add,
+                            op: Spanned::new(crate::expr::Operator::Add, Span::new(39, 40)),
                             rhs: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                sym: Symbol::new("rhs"),
+                                sym: Spanned::new(Symbol::new("rhs"), Span::new(41, 44)),
                                 valid: true,
                             }))),
                         }))),

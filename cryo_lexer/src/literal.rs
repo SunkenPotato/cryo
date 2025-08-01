@@ -48,7 +48,7 @@ impl Lex for Literal {
 pub struct StringLiteral(pub Symbol);
 
 impl TokenLike for StringLiteral {
-    fn from_token(token: &Token) -> Option<Spanned<&Self>> {
+    fn from_token(token: &Token) -> Option<Spanned<Self>> {
         let lit = Literal::from_token(token)?;
         match lit.t {
             Literal::StringLiteral(s) => Some(Spanned::new(s, lit.span)),
@@ -128,7 +128,7 @@ impl Lex for StringLiteral {
 pub struct IntegerLiteral(pub Symbol);
 
 impl TokenLike for IntegerLiteral {
-    fn from_token(token: &Token) -> Option<Spanned<&Self>> {
+    fn from_token(token: &Token) -> Option<Spanned<Self>> {
         let lit = Literal::from_token(token)?;
         match lit.t {
             Literal::IntegerLiteral(s) => Some(Spanned::new(s, lit.span)),

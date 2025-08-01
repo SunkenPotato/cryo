@@ -79,7 +79,7 @@ impl Parse for Binding {
         tokens
             .with(Ident::parse)?
             .require(&LET)
-            .map_err(|_| ParseError::MissingKw(LET.with(Clone::clone)))?;
+            .map_err(|v| ParseError::MissingKw(v.sym.map(|_| LET.with(Clone::clone))))?;
 
         let mutability = match tokens.with(|tokens| {
             let ident = Ident::parse(tokens).map_err(Err)?;
@@ -128,21 +128,21 @@ mod tests {
                     mutability: None,
                     ident: TypedIdent {
                         ident: Ident {
-                            sym: Symbol::new("x"),
+                            sym: Spanned::new(Symbol::new("x"), Span::new(4, 5)),
                             valid: true,
                         },
                         id_ty: Ty {
-                            sym: Symbol::new("int"),
+                            sym: Spanned::new(Symbol::new("int"), Span::new(7, 10)),
                             valid: true,
                         },
                     },
                     expr: Expr::BinaryExpr(BinaryExpr {
                         lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(5),
+                            Spanned::new(IntegerLiteral::Value(5), Span::new(13, 14)),
                         )))),
-                        op: Operator::Add,
+                        op: Spanned::new(Operator::Add, Span::new(15, 16)),
                         rhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(5),
+                            Spanned::new(IntegerLiteral::Value(5), Span::new(17, 18)),
                         )))),
                     }),
                 }),
@@ -160,17 +160,18 @@ mod tests {
                     mutability: Some(Mutable),
                     ident: TypedIdent {
                         ident: Ident {
-                            sym: Symbol::new("x"),
+                            sym: Spanned::new(Symbol::new("x"), Span::new(8, 9)),
                             valid: true,
                         },
                         id_ty: Ty {
-                            sym: Symbol::new("int"),
+                            sym: Spanned::new(Symbol::new("int"), Span::new(11, 14)),
                             valid: true,
                         },
                     },
-                    expr: Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                    expr: Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(Spanned::new(
                         IntegerLiteral::Value(5),
-                    ))),
+                        Span::new(17, 18),
+                    )))),
                 }),
                 Span::new(0, 19),
             ),

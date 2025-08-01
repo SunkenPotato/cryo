@@ -28,10 +28,11 @@ impl Span {
 
     /// Create a new [`Span`] from a start and a stop.
     ///
-    /// If `start < stop`, this function will panic.
+    /// If `start > stop`, this function will panic.
     #[inline]
     #[track_caller]
     pub const fn new(start: u32, stop: u32) -> Self {
+        debug_assert!(start <= stop);
         Self { start, stop }
     }
 
