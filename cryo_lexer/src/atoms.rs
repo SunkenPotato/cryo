@@ -26,7 +26,7 @@ macro_rules! atom {
         #[cfg(test)]
         ::paste::paste! {
             #[test]
-            #[allow(non_snake_case)]
+            #[expect(non_snake_case)]
             fn [<lex_ $identifier>]() {
                 use $crate::Lex;
 
@@ -98,12 +98,12 @@ macro_rules! atom {
 
         #[cfg(test)]
         ::paste::paste! {
-            #[allow(non_snake_case)]
+            #[expect(non_snake_case)]
             mod [<$identifier _tests>] {
                 use $crate::Lex;
                 $(
                     #[test]
-                    #[allow(non_snake_case)]
+                    #[expect(non_snake_case)]
                     fn [<lex_ $identifier _ $variant>]() {
                         assert_eq!(
                             $crate::TokenType::lex(super::$identifier::$variant.as_str()),

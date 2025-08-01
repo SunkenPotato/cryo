@@ -33,7 +33,7 @@ impl TokenStream {
 
     // so that tests do not have to interact with the lexer.
     //#[cfg(test)]
-    #[allow(missing_docs)]
+    #[expect(missing_docs)]
     pub fn new(s: impl IntoIterator<Item = Token>) -> Self {
         Self {
             inner: s.into_iter().collect(),
@@ -124,13 +124,27 @@ mod guard {
         /// Returns [`TokenStreamError::IncorrectToken`] if the token was not able to be converted to `T`.
         ///
         /// See also [`TokenStreamGuard::advance`].
-        #[track_caller]
+        #[cfg_attr(test, track_caller)]
         pub fn advance_require<T: TokenLike>(&mut self) -> Result<Spanned<T>, TokenStreamError> {
-            self.stream
+            let v = self
+                .stream
                 .get(*self.cursor)
                 .ok_or(TokenStreamError::EndOfInput)
                 .and_then(|v| v.require::<T>().ok_or(TokenStreamError::IncorrectToken(*v)))
-                .inspect(|_| *self.cursor += 1)
+                .inspect(|_| *self.cursor += 1);
+
+            #[cfg(test)]
+            #[expect(unused_must_use)]
+            v.as_ref().inspect_err(|e| {
+                eprintln!(
+                    "{} requested `{}`, got {:?} instead.",
+                    core::panic::Location::caller(),
+                    core::any::type_name::<T>(),
+                    e
+                )
+            });
+
+            v
         }
 
         /// Peek at the next token in the stream. This function will not advance the stream, so calling it multiple times will result in the same outcome.
@@ -184,7 +198,7 @@ impl<T, E> Sealed for Result<T, E> {}
 impl<T> Sealed for Option<T> {}
 
 /// Provides common behavior for creating a stream guard.
-#[allow(private_bounds)]
+#[expect(private_bounds)]
 pub trait StreamLike: Sealed {
     /// Grant access to a [`Guard`], providing a save-discard-like system, where if the closure returns `Result::Ok`, the
     /// changes applied to the guard inside the closure are committed, else discarded.
@@ -202,7 +216,6 @@ impl Sealed for TokenStream {}
 impl Sealed for Guard<'_> {}
 
 impl StreamLike for TokenStream {
-    #[allow(private_bounds)]
     fn with<F, T, E>(&mut self, f: F) -> Result<T, E>
     where
         F: FnOnce(&mut Guard) -> Result<T, E>,
@@ -237,7 +250,6 @@ impl StreamLike for TokenStream {
 }
 
 impl<'stream> StreamLike for Guard<'stream> {
-    #[allow(private_bounds)]
     fn with<F, T, E>(&mut self, f: F) -> Result<T, E>
     where
         F: FnOnce(&mut Guard) -> Result<T, E>,

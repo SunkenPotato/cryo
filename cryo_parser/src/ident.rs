@@ -26,7 +26,8 @@ keywords! {
     MUT = mut,
     IF = if,
     ELSE = else,
-    FUN = fun
+    FUN = fun,
+    STRUCT = struct
 }
 
 /// A validated identifier, that is, one proven not to be a keyword.

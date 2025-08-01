@@ -161,7 +161,7 @@ pub enum TokenType {
 trait Sealed {}
 
 /// Trait for attempting to convert `Token`s into concrete types.
-#[allow(private_bounds)]
+#[expect(private_bounds)]
 pub trait TokenLike: Sealed + Sized {
     /// Attempt to convert a given token into `Self`.
     fn from_token(token: &Token) -> Option<Spanned<Self>>;
