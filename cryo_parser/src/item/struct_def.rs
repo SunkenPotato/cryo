@@ -9,7 +9,7 @@ use cryo_span::Spanned;
 use crate::{
     Parse, Punctuated,
     atoms::Comma,
-    ident::{ENUM, Ident, STRUCT},
+    ident::{ENUM, Ident, STRUCT, UNION},
     stmt::TypedIdent,
 };
 
@@ -138,6 +138,33 @@ impl Parse for EnumVariant {
     }
 }
 
+/// A union.
+///
+/// This is similar to an enum, except that this is untagged, i.e., does not track its state.
+#[derive(Debug, PartialEq, Eq)]
+pub struct UnionDef {
+    /// The identifier of this union.
+    pub ident: Ident,
+    /// The different states this union may have.
+    pub states: Spanned<Punctuated<TypedIdent, Comma>>,
+}
+
+impl Parse for UnionDef {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        tokens
+            .with(Ident::parse)?
+            .require(&UNION)
+            .map_err(|v| v.sym.map(|_| UNION.with(Clone::clone)))?;
+
+        let ident = tokens.with(Ident::parse)?;
+        tokens.advance_require::<LCurly>()?;
+        let states = tokens.spanning(Punctuated::parse)?;
+        tokens.advance_require::<RCurly>()?;
+
+        Ok(Self { ident, states })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use cryo_lexer::Symbol;
@@ -148,7 +175,7 @@ mod tests {
         test_util::assert_parse,
     };
 
-    use super::{EnumDef, EnumVariant, StructBody, StructDef};
+    use super::{EnumDef, EnumVariant, StructBody, StructDef, UnionDef};
 
     #[test]
     fn parse_unit_struct() {
@@ -396,5 +423,58 @@ mod tests {
                 Span::new(0, 61),
             ),
         );
+    }
+
+    #[test]
+    fn parse_union_def() {
+        assert_parse(
+            "union Union { a: int, b: int }",
+            Spanned::new(
+                Item::UnionDef(UnionDef {
+                    ident: Ident {
+                        sym: Spanned::new(Symbol::new("Union"), Span::new(6, 11)),
+                        valid: true,
+                    },
+                    states: Spanned::new(
+                        Punctuated {
+                            inner: vec![(
+                                Spanned::new(
+                                    TypedIdent {
+                                        ident: Ident {
+                                            sym: Spanned::new(Symbol::new("a"), Span::new(14, 15)),
+                                            valid: true,
+                                        },
+                                        id_ty: Ident {
+                                            sym: Spanned::new(
+                                                Symbol::new("int"),
+                                                Span::new(17, 20),
+                                            ),
+                                            valid: true,
+                                        },
+                                    },
+                                    Span::new(14, 20),
+                                ),
+                                Spanned::new(Comma, Span::new(20, 21)),
+                            )],
+                            last: Some(Box::new(Spanned::new(
+                                TypedIdent {
+                                    ident: Ident {
+                                        sym: Spanned::new(Symbol::new("b"), Span::new(22, 23)),
+                                        valid: true,
+                                    },
+                                    id_ty: Ident {
+                                        sym: Spanned::new(Symbol::new("int"), Span::new(25, 28)),
+                                        valid: true,
+                                    },
+                                },
+                                Span::new(22, 28),
+                            ))),
+                        },
+                        Span::new(14, 28),
+                    ),
+                }),
+                Span::new(0, 30),
+            ),
+        )
     }
 }
