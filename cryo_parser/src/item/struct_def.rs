@@ -9,7 +9,7 @@ use cryo_span::Spanned;
 use crate::{
     Parse, Punctuated,
     atoms::Comma,
-    ident::{Ident, STRUCT},
+    ident::{ENUM, Ident, STRUCT},
     stmt::TypedIdent,
 };
 
@@ -95,6 +95,49 @@ impl StructBody {
     }
 }
 
+/// An enum definition.
+#[derive(Debug, PartialEq, Eq)]
+pub struct EnumDef {
+    /// The identifier of this enum.
+    pub ident: Ident,
+    /// The enum variants.
+    pub variants: Spanned<Punctuated<EnumVariant, Comma>>,
+}
+
+impl Parse for EnumDef {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        tokens
+            .with(Ident::parse)?
+            .require(&ENUM)
+            .map_err(|v| v.sym.map(|_| ENUM.with(Clone::clone)))?;
+
+        let ident = tokens.with(Ident::parse)?;
+        tokens.advance_require::<LCurly>()?;
+        let variants = tokens.spanning(Punctuated::parse)?;
+        tokens.advance_require::<RCurly>()?;
+
+        Ok(Self { ident, variants })
+    }
+}
+
+/// An enum variant.
+#[derive(Debug, PartialEq, Eq)]
+pub struct EnumVariant {
+    /// The identifier of this enum.
+    pub ident: Ident,
+    /// The body of this variant.
+    pub body: Spanned<StructBody>,
+}
+
+impl Parse for EnumVariant {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        let ident = tokens.with(Ident::parse)?;
+        let body = tokens.spanning(StructBody::parse::<false>)?;
+
+        Ok(Self { ident, body })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use cryo_lexer::Symbol;
@@ -105,7 +148,7 @@ mod tests {
         test_util::assert_parse,
     };
 
-    use super::{StructBody, StructDef};
+    use super::{EnumDef, EnumVariant, StructBody, StructDef};
 
     #[test]
     fn parse_unit_struct() {
@@ -214,6 +257,143 @@ mod tests {
                     ),
                 }),
                 Span::new(0, 30),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_enum_def() {
+        assert_parse(
+            "enum Enum { Unit, Tuple(int, int), Named { x: int, y: int } }",
+            Spanned::new(
+                Item::EnumDef(EnumDef {
+                    ident: Ident {
+                        sym: Spanned::new(Symbol::new("Enum"), Span::new(5, 9)),
+                        valid: true,
+                    },
+                    variants: Spanned::new(
+                        Punctuated {
+                            inner: vec![
+                                (
+                                    Spanned::new(
+                                        EnumVariant {
+                                            ident: Ident {
+                                                sym: Spanned::new(
+                                                    Symbol::new("Unit"),
+                                                    Span::new(12, 16),
+                                                ),
+                                                valid: true,
+                                            },
+                                            body: Spanned::new(StructBody::Unit, Span::new(16, 16)),
+                                        },
+                                        Span::new(12, 16),
+                                    ),
+                                    Spanned::new(Comma, Span::new(16, 17)),
+                                ),
+                                (
+                                    Spanned::new(
+                                        EnumVariant {
+                                            ident: Ident {
+                                                sym: Spanned::new(
+                                                    Symbol::new("Tuple"),
+                                                    Span::new(18, 23),
+                                                ),
+                                                valid: true,
+                                            },
+                                            body: Spanned::new(
+                                                StructBody::Tuple(Punctuated {
+                                                    inner: vec![(
+                                                        Spanned::new(
+                                                            Ident {
+                                                                sym: Spanned::new(
+                                                                    Symbol::new("int"),
+                                                                    Span::new(24, 27),
+                                                                ),
+                                                                valid: true,
+                                                            },
+                                                            Span::new(24, 27),
+                                                        ),
+                                                        Spanned::new(Comma, Span::new(27, 28)),
+                                                    )],
+                                                    last: Some(Box::new(Spanned::new(
+                                                        Ident {
+                                                            sym: Spanned::new(
+                                                                Symbol::new("int"),
+                                                                Span::new(29, 32),
+                                                            ),
+                                                            valid: true,
+                                                        },
+                                                        Span::new(29, 32),
+                                                    ))),
+                                                }),
+                                                Span::new(23, 33),
+                                            ),
+                                        },
+                                        Span::new(18, 33),
+                                    ),
+                                    Spanned::new(Comma, Span::new(33, 34)),
+                                ),
+                            ],
+                            last: Some(Box::new(Spanned::new(
+                                EnumVariant {
+                                    ident: Ident {
+                                        sym: Spanned::new(Symbol::new("Named"), Span::new(35, 40)),
+                                        valid: true,
+                                    },
+                                    body: Spanned::new(
+                                        StructBody::Named(Punctuated {
+                                            inner: vec![(
+                                                Spanned::new(
+                                                    TypedIdent {
+                                                        ident: Ident {
+                                                            sym: Spanned::new(
+                                                                Symbol::new("x"),
+                                                                Span::new(43, 44),
+                                                            ),
+                                                            valid: true,
+                                                        },
+                                                        id_ty: Ident {
+                                                            sym: Spanned::new(
+                                                                Symbol::new("int"),
+                                                                Span::new(46, 49),
+                                                            ),
+                                                            valid: true,
+                                                        },
+                                                    },
+                                                    Span::new(43, 49),
+                                                ),
+                                                Spanned::new(Comma, Span::new(49, 50)),
+                                            )],
+                                            last: Some(Box::new(Spanned::new(
+                                                TypedIdent {
+                                                    ident: Ident {
+                                                        sym: Spanned::new(
+                                                            Symbol::new("y"),
+                                                            Span::new(51, 52),
+                                                        ),
+                                                        valid: true,
+                                                    },
+                                                    id_ty: Ident {
+                                                        sym: Spanned::new(
+                                                            Symbol::new("int"),
+                                                            Span::new(54, 57),
+                                                        ),
+                                                        valid: true,
+                                                    },
+                                                },
+                                                Span::new(51, 57),
+                                            ))),
+                                        }),
+                                        Span::new(41, 59),
+                                    ),
+                                },
+                                Span::new(35, 59),
+                            ))),
+                        },
+                        Span::new(12, 59),
+                    ),
+                }),
+                Span::new(0, 61),
             ),
         );
     }

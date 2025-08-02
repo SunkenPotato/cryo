@@ -275,9 +275,19 @@ impl<'stream> StreamLike for Guard<'stream> {
     {
         let cursor_before = *self.cursor;
         let result = self.with(f)?;
-        let final_span = self.stream[cursor_before..*self.cursor]
-            .iter()
-            .fold(self.stream[cursor_before].span, |b, token| b + token.span);
+        let final_span = if cursor_before == *self.cursor {
+            let st = if cursor_before > 0 {
+                self.stream[cursor_before - 1].span.stop
+            } else {
+                0
+            };
+
+            Span::new(st, st)
+        } else {
+            self.stream[cursor_before..*self.cursor]
+                .iter()
+                .fold(self.stream[cursor_before].span, |b, token| b + token.span)
+        };
 
         Ok(Spanned::new(result, final_span))
     }

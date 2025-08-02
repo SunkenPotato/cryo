@@ -27,7 +27,8 @@ keywords! {
     IF = if,
     ELSE = else,
     FUN = fun,
-    STRUCT = struct
+    STRUCT = struct,
+    ENUM = enum
 }
 
 /// A validated identifier, that is, one proven not to be a keyword.

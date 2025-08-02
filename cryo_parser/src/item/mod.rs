@@ -3,7 +3,7 @@
 
 use cryo_lexer::stream::StreamLike;
 use fn_def::FnDef;
-use struct_def::StructDef;
+use struct_def::{EnumDef, StructDef};
 
 use crate::{Parse, ident::Ident};
 
@@ -20,6 +20,8 @@ pub enum Item {
     FnDef(FnDef),
     /// A structure definition.
     StructDef(StructDef),
+    /// An enum definition.
+    EnumDef(EnumDef),
 }
 
 impl Parse for Item {
@@ -28,5 +30,6 @@ impl Parse for Item {
             .with(FnDef::parse)
             .map(Self::FnDef)
             .or_else(|_| tokens.with(StructDef::parse).map(Self::StructDef))
+            .or_else(|_| tokens.with(EnumDef::parse).map(Self::EnumDef))
     }
 }
