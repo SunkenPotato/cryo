@@ -6,7 +6,7 @@ use std::fmt::Debug;
 
 use cryo_lexer::{
     TokenType,
-    atoms::{Equal, LCurly, LParen, RCurly},
+    atoms::{Equal, LCurly, LParen, RCurly, RParen},
     identifier::Identifier,
     stream::{Guard, StreamLike},
 };
@@ -283,6 +283,7 @@ impl Parse for FnCall {
         let func = Box::new(tokens.spanning(Expr::parse)?);
         tokens.advance_require::<LParen>()?;
         let args = tokens.spanning(Punctuated::parse)?;
+        tokens.advance_require::<RParen>()?;
 
         Ok(Self { func, args })
     }
@@ -295,13 +296,32 @@ impl Parse for BaseExpr {
             .map(Self::Lit)
             .or_else(|_| tokens.with(CondExpr::parse).map(Self::CondExpr))
             .or_else(|_| tokens.with(BlockExpr::parse).map(Self::BlockExpr))
-            .or_else(|_| tokens.with(Ident::parse).map(Self::BindingUsage))
+            .or_else(|_| {
+                let ident = tokens.spanning(Ident::parse);
+
+                match ident {
+                    Ok(ident) => match tokens.peek_require::<LParen>() {
+                        Ok(_) => {
+                            tokens
+                                .advance()
+                                .expect("LParen token has already been confirmed");
+                            let args = tokens.spanning(Punctuated::parse)?;
+                            tokens.advance_require::<RParen>()?;
+                            Ok(Self::FnCall(FnCall {
+                                func: Box::new(ident.map(Self::BindingUsage).map(Expr::BaseExpr)),
+                                args,
+                            }))
+                        }
+                        Err(_) => Ok(Self::BindingUsage(ident.t)),
+                    },
+                    Err(e) => Err(e),
+                }
+            })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    #![allow(missing_docs)]
     use cryo_lexer::Symbol;
     use cryo_span::{Span, Spanned};
 
@@ -315,7 +335,7 @@ mod tests {
         test_util::assert_parse,
     };
 
-    use super::BlockExpr;
+    use super::{BlockExpr, FnCall, literal::StringLiteral};
 
     #[test]
     fn parse_add() {
@@ -589,7 +609,7 @@ mod tests {
                                     Span::new(18, 20),
                                 ),
                             },
-                            Span::new(13, 20),
+                            Span::new(8, 20),
                         )]),
                         Span::new(8, 20),
                     ),
@@ -658,5 +678,39 @@ mod tests {
                 Span::new(0, 28),
             ),
         )
+    }
+
+    #[test]
+    fn parse_fn_call() {
+        assert_parse(
+            "printf(\"hello, world\")",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::FnCall(FnCall {
+                    func: Box::new(Spanned::new(
+                        Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
+                            sym: Spanned::new(Symbol::new("printf"), Span::new(0, 6)),
+                            valid: true,
+                        })),
+                        Span::new(0, 6),
+                    )),
+                    args: Spanned::new(
+                        crate::Punctuated {
+                            inner: vec![],
+                            last: Some(Box::new(Spanned::new(
+                                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(
+                                    Spanned::new(
+                                        StringLiteral::Value(Box::from("hello, world")),
+                                        Span::new(7, 21),
+                                    ),
+                                ))),
+                                Span::new(7, 21),
+                            ))),
+                        },
+                        Span::new(7, 21),
+                    ),
+                })),
+                Span::new(0, 22),
+            ),
+        );
     }
 }

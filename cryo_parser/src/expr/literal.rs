@@ -8,7 +8,6 @@ use cryo_lexer::{
     stream::StreamLike,
 };
 use cryo_span::Spanned;
-use itertools::Itertools;
 
 use crate::Parse;
 
@@ -84,7 +83,7 @@ pub enum StringLiteral {
     /// The value of this literal.
     Value(Box<str>),
     /// The literal contained an invalid escape.
-    InvalidEscape(char),
+    InvalidEscape(Option<char>),
 }
 
 impl Parse for StringLiteral {
@@ -93,23 +92,21 @@ impl Parse for StringLiteral {
         let token = tokens.advance_require::<SToken>()?;
         let mut buffer = String::with_capacity(token.0.len());
 
-        let mut iter = token.0.chars().tuple_windows();
+        let mut iter = token.0.chars().peekable();
 
-        while let Some((a, b)) = iter.next() {
+        while let Some(a) = iter.next() {
             if let '\\' = a {
-                buffer.push(match b {
-                    'n' => '\n',
-                    't' => '\t',
-                    '0' => '\0',
-                    '"' => '"',
+                buffer.push(match iter.peek() {
+                    Some('n') => '\n',
+                    Some('t') => '\t',
+                    Some('0') => '\0',
                     esc => {
-                        return Ok(StringLiteral::InvalidEscape(esc));
+                        return Ok(StringLiteral::InvalidEscape(esc.cloned()));
                     }
                 });
 
                 iter.next();
             } else {
-                // a because the last b is guaranteed to be '"'
                 buffer.push(a)
             }
         }
@@ -188,12 +185,26 @@ mod tests {
     }
 
     #[test]
+    fn parse_usual_str_lit() {
+        assert_parse(
+            "\"hello, world\"",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(Spanned::new(
+                    StringLiteral::Value(Box::from("hello, world")),
+                    Span::new(0, 14),
+                )))),
+                Span::new(0, 14),
+            ),
+        )
+    }
+
+    #[test]
     fn fail_parse_str_lit_invalid_escape() {
         assert_parse(
             "\"hello, world\\x\"",
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::Lit(Literal::StringLiteral(Spanned::new(
-                    StringLiteral::InvalidEscape('x'),
+                    StringLiteral::InvalidEscape(Some('x')),
                     Span::new(0, 16),
                 )))),
                 Span::new(0, 16),
