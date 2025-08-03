@@ -37,6 +37,12 @@ trait Parse: Sized {
     fn parse(tokens: &mut Guard) -> ParseResult<Self>;
 }
 
+impl Parse for () {
+    fn parse(_: &mut Guard) -> ParseResult<Self> {
+        Ok(())
+    }
+}
+
 impl<T: Parse> Parse for Vec<Spanned<T>> {
     fn parse(parser: &mut Guard) -> ParseResult<Self> {
         let mut buf = vec![];
@@ -58,13 +64,18 @@ pub struct Punctuated<T, P> {
     pub last: Option<Box<Spanned<T>>>,
 }
 
-impl<T: Parse, P: Parse> Parse for Punctuated<T, P> {
-    fn parse(tokens: &mut Guard) -> ParseResult<Self> {
+impl<T, P> Punctuated<T, P> {
+    /// Parse with the given closures. This is often not what you want, instead see [`Punctuated::parse`].
+    pub fn parse_with<FT, FP>(tokens: &mut Guard, mut ft: FT, mut fp: FP) -> ParseResult<Self>
+    where
+        FT: FnMut(&mut Guard) -> ParseResult<T>,
+        FP: FnMut(&mut Guard) -> ParseResult<P>,
+    {
         let mut inner = vec![];
         let mut last = None;
 
-        while let Ok(t) = tokens.spanning(T::parse) {
-            match tokens.spanning(P::parse) {
+        while let Ok(t) = tokens.spanning(&mut ft) {
+            match tokens.spanning(&mut fp) {
                 Ok(p) => inner.push((t, p)),
                 Err(_) => {
                     last.replace(Box::new(t));
@@ -74,6 +85,28 @@ impl<T: Parse, P: Parse> Parse for Punctuated<T, P> {
         }
 
         Ok(Self { inner, last })
+    }
+}
+
+impl<T: Parse, P: Parse> Parse for Punctuated<T, P> {
+    fn parse(tokens: &mut Guard) -> ParseResult<Self> {
+        Self::parse_with(tokens, T::parse, P::parse)
+    }
+}
+
+impl<T> From<Punctuated<T, ()>> for Vec<Spanned<T>> {
+    fn from(mut value: Punctuated<T, ()>) -> Vec<Spanned<T>> {
+        let mut vec = value
+            .inner
+            .into_iter()
+            .map(|v| v.0)
+            .collect::<Vec<Spanned<T>>>();
+
+        if let Some(v) = value.last.take() {
+            vec.push(*v);
+        }
+
+        vec
     }
 }
 

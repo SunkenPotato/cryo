@@ -6,14 +6,15 @@ use std::fmt::Debug;
 
 use cryo_lexer::{
     TokenType,
-    atoms::{Equal, LCurly, RCurly},
+    atoms::{Equal, LCurly, LParen, RCurly},
     identifier::Identifier,
     stream::{Guard, StreamLike},
 };
 use cryo_span::Spanned;
 
 use crate::{
-    Parse, ParseError,
+    Parse, ParseError, Punctuated,
+    atoms::Comma,
     expr::literal::Literal,
     ident::{ELSE, IF, Ident},
     stmt::Stmt,
@@ -38,6 +39,8 @@ pub enum Operator {
     Eq,
     /// The inequality comparison operator.
     NotEq,
+    /// The accessor operator.
+    Access,
 }
 
 impl Operator {
@@ -49,6 +52,7 @@ impl Operator {
             TokenType::Star(_) => Operator::Mul,
             TokenType::Slash(_) => Operator::Div,
             TokenType::Percent(_) => Operator::Rem,
+            TokenType::Dot(_) => Operator::Access,
             TokenType::Equal(_) => {
                 tokens.peek_require::<Equal>()?;
                 if CONSUME {
@@ -95,6 +99,7 @@ impl Operator {
             Self::NotEq | Self::Eq => 1,
             Self::Add | Self::Sub => 2,
             Self::Mul | Self::Div | Self::Rem => 3,
+            Self::Access => 4,
         }
     }
 }
@@ -162,6 +167,8 @@ pub enum BaseExpr {
     BlockExpr(BlockExpr),
     /// A conditional expression.
     CondExpr(CondExpr),
+    /// A function call.
+    FnCall(FnCall),
 }
 
 /// A block expression, i.e., a series of statements and a final optional tail expression surrounded by `{` and `}`.
@@ -188,42 +195,52 @@ impl Parse for BlockExpr {
 #[derive(PartialEq, Eq, Debug)]
 pub struct CondExpr {
     /// The main `if` block, this is required.
-    pub if_block: IfBlock,
+    pub if_block: Spanned<IfBlock>,
     /// The optional `else if` block(s).
-    pub else_if_blocks: Box<[IfBlock]>,
+    pub else_if_blocks: Spanned<Box<[Spanned<IfBlock>]>>,
     /// The else block, this will be evaluated if none of the conditions in the blocks return `true`.
-    pub else_block: Option<BlockExpr>,
+    pub else_block: Option<Spanned<BlockExpr>>,
 }
 
 impl Parse for CondExpr {
     fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
-        let if_block = tokens.with(IfBlock::parse)?;
-        let mut else_if_blocks = vec![];
-        let mut else_block = None;
+        let if_block = tokens.spanning(IfBlock::parse)?;
+        let else_if_blocks = tokens
+            .spanning(|tokens| {
+                let mut vec = vec![];
+                while let Ok(else_kw) = tokens.peek_require::<Identifier>()
+                    && ELSE.with(|k| *k == else_kw.t.0)
+                    && let Ok(if_kw) = tokens.peek_nth_require::<Identifier>(1)
+                    && IF.with(|k| *k == if_kw.t.0)
+                {
+                    let else_start = tokens
+                        .advance()
+                        .expect("`else` identifier has already been confirmed")
+                        .span
+                        .start;
 
-        while let Ok(ident) = tokens.with(Ident::parse)
-            && let Ok(_) = ident.require(&ELSE)
-        {
-            if let Ok(possible_if_token) = tokens.peek_require::<Identifier>()
-                && let Ok(_) = Ident::from(possible_if_token).require(&IF)
-            {
-                let Ok(else_if_block) = tokens.with(IfBlock::parse) else {
-                    break;
-                };
+                    match tokens.spanning(IfBlock::parse) {
+                        Ok(mut v) => {
+                            v.span.start = else_start;
+                            vec.push(v);
+                        }
+                        Err(_) => break,
+                    }
+                }
 
-                else_if_blocks.push(else_if_block);
-            } else {
-                let Ok(block_expr) = tokens.with(BlockExpr::parse) else {
-                    break;
-                };
-                else_block.replace(block_expr);
-                break;
-            }
-        }
+                Ok::<Vec<Spanned<IfBlock>>, ParseError>(vec)
+            })?
+            .map(|v| v.into_boxed_slice());
+
+        let else_block = tokens.advance_require::<Identifier>().ok().and_then(|v| {
+            ELSE.with(|k| *k == v.t.0)
+                .then(|| tokens.spanning(BlockExpr::parse).ok())
+                .flatten()
+        });
 
         Ok(Self {
             if_block,
-            else_if_blocks: else_if_blocks.into_boxed_slice(),
+            else_if_blocks,
             else_block,
         })
     }
@@ -233,9 +250,9 @@ impl Parse for CondExpr {
 #[derive(PartialEq, Eq, Debug)]
 pub struct IfBlock {
     /// The condition for this block.
-    pub cond: Box<Expr>,
+    pub cond: Box<Spanned<Expr>>,
     /// The code to be executed.
-    pub block: BlockExpr,
+    pub block: Spanned<BlockExpr>,
 }
 
 impl Parse for IfBlock {
@@ -245,10 +262,29 @@ impl Parse for IfBlock {
             .require(&IF)
             .map_err(|v| ParseError::MissingKw(v.sym.map(|_| IF.with(Clone::clone))))?;
 
-        let cond = Box::new(tokens.with(Expr::parse)?);
-        let block = tokens.with(BlockExpr::parse)?;
+        let cond = Box::new(tokens.spanning(Expr::parse)?);
+        let block = tokens.spanning(BlockExpr::parse)?;
 
         Ok(Self { cond, block })
+    }
+}
+
+/// A function call.
+#[derive(Debug, PartialEq, Eq)]
+pub struct FnCall {
+    /// The function.
+    pub func: Box<Spanned<Expr>>,
+    /// The arguments passed.
+    pub args: Spanned<Punctuated<Expr, Comma>>,
+}
+
+impl Parse for FnCall {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        let func = Box::new(tokens.spanning(Expr::parse)?);
+        tokens.advance_require::<LParen>()?;
+        let args = tokens.spanning(Punctuated::parse)?;
+
+        Ok(Self { func, args })
     }
 }
 
@@ -483,17 +519,26 @@ mod tests {
             "if f {}",
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::CondExpr(CondExpr {
-                    if_block: IfBlock {
-                        cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
-                            valid: true,
-                        }))),
-                        block: BlockExpr {
-                            stmts: Box::new([]),
-                            tail: None,
+                    if_block: Spanned::new(
+                        IfBlock {
+                            cond: Box::new(Spanned::new(
+                                Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
+                                    sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
+                                    valid: true,
+                                })),
+                                Span::new(3, 4),
+                            )),
+                            block: Spanned::new(
+                                BlockExpr {
+                                    stmts: Box::new([]),
+                                    tail: None,
+                                },
+                                Span::new(5, 7),
+                            ),
                         },
-                    },
-                    else_if_blocks: Box::new([]),
+                        Span::new(0, 7),
+                    ),
+                    else_if_blocks: Spanned::new(Box::new([]), Span::new(7, 7)),
                     else_block: None,
                 })),
                 Span::new(0, 7),
@@ -507,26 +552,47 @@ mod tests {
             "if f {} else if g {}",
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::CondExpr(CondExpr {
-                    if_block: IfBlock {
-                        cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
-                            valid: true,
-                        }))),
-                        block: BlockExpr {
-                            stmts: Box::new([]),
-                            tail: None,
+                    if_block: Spanned::new(
+                        IfBlock {
+                            cond: Box::new(Spanned::new(
+                                Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
+                                    sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
+                                    valid: true,
+                                })),
+                                Span::new(3, 4),
+                            )),
+                            block: Spanned::new(
+                                BlockExpr {
+                                    stmts: Box::new([]),
+                                    tail: None,
+                                },
+                                Span::new(5, 7),
+                            ),
                         },
-                    },
-                    else_if_blocks: Box::new([IfBlock {
-                        cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Spanned::new(Symbol::new("g"), Span::new(16, 17)),
-                            valid: true,
-                        }))),
-                        block: BlockExpr {
-                            stmts: Box::new([]),
-                            tail: None,
-                        },
-                    }]),
+                        Span::new(0, 7),
+                    ),
+                    else_if_blocks: Spanned::new(
+                        Box::new([Spanned::new(
+                            IfBlock {
+                                cond: Box::new(Spanned::new(
+                                    Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
+                                        sym: Spanned::new(Symbol::new("g"), Span::new(16, 17)),
+                                        valid: true,
+                                    })),
+                                    Span::new(16, 17),
+                                )),
+                                block: Spanned::new(
+                                    BlockExpr {
+                                        stmts: Box::new([]),
+                                        tail: None,
+                                    },
+                                    Span::new(18, 20),
+                                ),
+                            },
+                            Span::new(13, 20),
+                        )]),
+                        Span::new(8, 20),
+                    ),
                     else_block: None,
                 })),
                 Span::new(0, 20),
@@ -535,35 +601,59 @@ mod tests {
     }
 
     #[test]
-    fn parse_cond_expr_if_else_if_else() {
+    fn parse_cond_expr_if_elseif_else() {
         assert_parse(
             "if f {} else if g {} else {}",
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::CondExpr(CondExpr {
-                    if_block: IfBlock {
-                        cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
-                            valid: true,
-                        }))),
-                        block: BlockExpr {
+                    if_block: Spanned::new(
+                        IfBlock {
+                            cond: Box::new(Spanned::new(
+                                Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
+                                    sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
+                                    valid: true,
+                                })),
+                                Span::new(3, 4),
+                            )),
+                            block: Spanned::new(
+                                BlockExpr {
+                                    stmts: Box::new([]),
+                                    tail: None,
+                                },
+                                Span::new(5, 7),
+                            ),
+                        },
+                        Span::new(0, 7),
+                    ),
+                    else_if_blocks: Spanned::new(
+                        Box::new([Spanned::new(
+                            IfBlock {
+                                cond: Box::new(Spanned::new(
+                                    Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
+                                        sym: Spanned::new(Symbol::new("g"), Span::new(16, 17)),
+                                        valid: true,
+                                    })),
+                                    Span::new(16, 17),
+                                )),
+                                block: Spanned::new(
+                                    BlockExpr {
+                                        stmts: Box::new([]),
+                                        tail: None,
+                                    },
+                                    Span::new(18, 20),
+                                ),
+                            },
+                            Span::new(8, 20),
+                        )]),
+                        Span::new(8, 20),
+                    ),
+                    else_block: Some(Spanned::new(
+                        BlockExpr {
                             stmts: Box::new([]),
                             tail: None,
                         },
-                    },
-                    else_if_blocks: Box::new([IfBlock {
-                        cond: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Spanned::new(Symbol::new("g"), Span::new(16, 17)),
-                            valid: true,
-                        }))),
-                        block: BlockExpr {
-                            stmts: Box::new([]),
-                            tail: None,
-                        },
-                    }]),
-                    else_block: Some(BlockExpr {
-                        stmts: Box::new([]),
-                        tail: None,
-                    }),
+                        Span::new(26, 28),
+                    )),
                 })),
                 Span::new(0, 28),
             ),
