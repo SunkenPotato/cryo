@@ -21,6 +21,7 @@ use cryo_lexer::{
 };
 use cryo_span::Spanned;
 use derive_more::From;
+use item::Item;
 
 type ParseResult<T> = Result<T, ParseError>;
 type SpannedParseResult<T> = Result<Spanned<T>, ParseError>;
@@ -32,6 +33,8 @@ pub enum ParseError {
     TokenStreamError(TokenStreamError),
     /// A keyword is missing.
     MissingKw(Spanned<Symbol>),
+    /// The parser could not make any progress.
+    NoProgress,
 }
 
 trait Parse: Sized {
@@ -119,8 +122,31 @@ where
     stream.spanning(T::parse)
 }
 
+/// An abstract syntax tree for a program.
+pub struct AbstractSyntaxTree {
+    /// The top-level items.
+    pub items: Vec<Item>,
+}
+
 /// The parser.
-#[expect(dead_code, reason = "no actual parser implementation yet")]
 pub struct Parser {
     stream: TokenStream,
+}
+
+impl Parser {
+    /// Create a parser from a given stream.
+    pub const fn new(stream: TokenStream) -> Self {
+        Self { stream }
+    }
+
+    /// Parse the contained tokens into an [`AbstractSyntaxTree`].
+    pub fn parse(mut self) -> Result<AbstractSyntaxTree, ParseError> {
+        let mut items = vec![];
+
+        while !self.stream.remaining().is_empty() {
+            items.push(self.stream.with(Item::parse)?);
+        }
+
+        Ok(AbstractSyntaxTree { items })
+    }
 }

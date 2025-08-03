@@ -11,7 +11,7 @@ use crate::{
     Parse, ParseError,
     expr::Expr,
     ident::{Ident, LET, MUT},
-    item::Ty,
+    item::{Item, Ty},
 };
 
 /// A statement.
@@ -21,6 +21,8 @@ pub enum Stmt {
     ExprSemi(Expr),
     /// A variable binding.
     Binding(Binding),
+    /// An item.
+    Item(Item),
 }
 
 fn parse_expr_semi(tokens: &mut Guard) -> crate::ParseResult<Expr> {
@@ -36,6 +38,7 @@ impl Parse for Stmt {
             .with(parse_expr_semi)
             .map(Self::ExprSemi)
             .or_else(|_| tokens.with(Binding::parse).map(Self::Binding))
+            .or_else(|_| tokens.with(Item::parse).map(Self::Item))
     }
 }
 
