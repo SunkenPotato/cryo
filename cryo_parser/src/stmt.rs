@@ -48,7 +48,6 @@ pub struct TypedIdent {
     /// The name of the identifier.
     pub ident: Ident,
     /// The type of this identifier
-    // TODO: replace with Ty once it becomes available
     pub id_ty: Ty,
 }
 
@@ -116,7 +115,6 @@ mod tests {
             literal::{IntegerLiteral, Literal},
         },
         ident::Ident,
-        item::Ty,
         test_util::assert_parse,
     };
 
@@ -134,10 +132,11 @@ mod tests {
                             sym: Spanned::new(Symbol::new("x"), Span::new(4, 5)),
                             valid: true,
                         },
-                        id_ty: Ty {
+                        id_ty: Ident {
                             sym: Spanned::new(Symbol::new("int"), Span::new(7, 10)),
                             valid: true,
-                        },
+                        }
+                        .into(),
                     },
                     expr: Expr::BinaryExpr(BinaryExpr {
                         lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
@@ -166,10 +165,11 @@ mod tests {
                             sym: Spanned::new(Symbol::new("x"), Span::new(8, 9)),
                             valid: true,
                         },
-                        id_ty: Ty {
+                        id_ty: Ident {
                             sym: Spanned::new(Symbol::new("int"), Span::new(11, 14)),
                             valid: true,
-                        },
+                        }
+                        .into(),
                     },
                     expr: Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(Spanned::new(
                         IntegerLiteral::Value(5),

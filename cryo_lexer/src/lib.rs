@@ -103,7 +103,6 @@ trait Lex: Sized {
 }
 
 /// The possible types a token may be. `'source` refers to the lifetime of the input given to the parser.
-// TODO: overflow subtypes into this to avoid nesting
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     /// An identifier.

@@ -5,13 +5,13 @@ use cryo_lexer::stream::StreamLike;
 use fn_def::FnDef;
 use struct_def::{EnumDef, StructDef, UnionDef};
 
-use crate::{Parse, ident::Ident};
+use crate::{Parse, path::Path};
 
 pub mod fn_def;
 pub mod struct_def;
 
 /// Placeholder for types.
-pub type Ty = Ident;
+pub type Ty = Path;
 
 /// An item.
 #[derive(Debug, PartialEq, Eq)]

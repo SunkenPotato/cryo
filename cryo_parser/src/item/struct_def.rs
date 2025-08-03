@@ -214,7 +214,8 @@ mod tests {
                                     Ident {
                                         sym: Spanned::new(Symbol::new("int"), Span::new(12, 15)),
                                         valid: true,
-                                    },
+                                    }
+                                    .into(),
                                     Span::new(12, 15),
                                 ),
                                 Spanned::new(Comma, Span::new(15, 16)),
@@ -223,7 +224,8 @@ mod tests {
                                 Ident {
                                     sym: Spanned::new(Symbol::new("int"), Span::new(17, 20)),
                                     valid: true,
-                                },
+                                }
+                                .into(),
                                 Span::new(17, 20),
                             ))),
                         }),
@@ -260,7 +262,8 @@ mod tests {
                                                 Span::new(17, 20),
                                             ),
                                             valid: true,
-                                        },
+                                        }
+                                        .into(),
                                     },
                                     Span::new(14, 20),
                                 ),
@@ -275,7 +278,8 @@ mod tests {
                                     id_ty: Ident {
                                         sym: Spanned::new(Symbol::new("int"), Span::new(25, 28)),
                                         valid: true,
-                                    },
+                                    }
+                                    .into(),
                                 },
                                 Span::new(22, 28),
                             ))),
@@ -337,7 +341,8 @@ mod tests {
                                                                     Span::new(24, 27),
                                                                 ),
                                                                 valid: true,
-                                                            },
+                                                            }
+                                                            .into(),
                                                             Span::new(24, 27),
                                                         ),
                                                         Spanned::new(Comma, Span::new(27, 28)),
@@ -349,7 +354,8 @@ mod tests {
                                                                 Span::new(29, 32),
                                                             ),
                                                             valid: true,
-                                                        },
+                                                        }
+                                                        .into(),
                                                         Span::new(29, 32),
                                                     ))),
                                                 }),
@@ -385,7 +391,8 @@ mod tests {
                                                                 Span::new(46, 49),
                                                             ),
                                                             valid: true,
-                                                        },
+                                                        }
+                                                        .into(),
                                                     },
                                                     Span::new(43, 49),
                                                 ),
@@ -406,7 +413,8 @@ mod tests {
                                                             Span::new(54, 57),
                                                         ),
                                                         valid: true,
-                                                    },
+                                                    }
+                                                    .into(),
                                                 },
                                                 Span::new(51, 57),
                                             ))),
@@ -450,7 +458,8 @@ mod tests {
                                                 Span::new(17, 20),
                                             ),
                                             valid: true,
-                                        },
+                                        }
+                                        .into(),
                                     },
                                     Span::new(14, 20),
                                 ),
@@ -465,7 +474,8 @@ mod tests {
                                     id_ty: Ident {
                                         sym: Spanned::new(Symbol::new("int"), Span::new(25, 28)),
                                         valid: true,
-                                    },
+                                    }
+                                    .into(),
                                 },
                                 Span::new(22, 28),
                             ))),

@@ -91,7 +91,8 @@ mod tests {
                                     id_ty: Ident {
                                         sym: Spanned::new(Symbol::new("int"), Span::new(13, 16)),
                                         valid: true,
-                                    },
+                                    }
+                                    .into(),
                                 },
                                 Span::new(8, 16),
                             ),
@@ -106,48 +107,34 @@ mod tests {
                                 id_ty: Ident {
                                     sym: Spanned::new(Symbol::new("int"), Span::new(23, 26)),
                                     valid: true,
-                                },
+                                }
+                                .into(),
                             },
                             Span::new(18, 26),
                         ))),
                     },
-                    ret_ty: Some(Ident {
-                        sym: Spanned::new(Symbol::new("int"), Span::new(29, 32)),
-                        valid: true,
-                    }),
+                    ret_ty: Some(
+                        Ident {
+                            sym: Spanned::new(Symbol::new("int"), Span::new(29, 32)),
+                            valid: true,
+                        }
+                        .into(),
+                    ),
                     body: BlockExpr {
                         stmts: Box::new([]),
                         tail: Some(Box::new(Expr::BinaryExpr(BinaryExpr {
                             lhs: Box::new(Expr::BaseExpr(BaseExpr::Path(
-                                Punctuated {
-                                    inner: vec![],
-                                    last: Some(Box::new(Spanned::new(
-                                        Ident {
-                                            sym: Spanned::new(
-                                                Symbol::new("lhs"),
-                                                Span::new(35, 38),
-                                            ),
-                                            valid: true,
-                                        },
-                                        Span::new(35, 38),
-                                    ))),
+                                Ident {
+                                    sym: Spanned::new(Symbol::new("lhs"), Span::new(35, 38)),
+                                    valid: true,
                                 }
                                 .into(),
                             ))),
                             op: Spanned::new(crate::expr::Operator::Add, Span::new(39, 40)),
                             rhs: Box::new(Expr::BaseExpr(BaseExpr::Path(
-                                Punctuated {
-                                    inner: vec![],
-                                    last: Some(Box::new(Spanned::new(
-                                        Ident {
-                                            sym: Spanned::new(
-                                                Symbol::new("rhs"),
-                                                Span::new(41, 44),
-                                            ),
-                                            valid: true,
-                                        },
-                                        Span::new(41, 44),
-                                    ))),
+                                Ident {
+                                    sym: Spanned::new(Symbol::new("rhs"), Span::new(41, 44)),
+                                    valid: true,
                                 }
                                 .into(),
                             ))),

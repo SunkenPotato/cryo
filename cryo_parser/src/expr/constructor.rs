@@ -76,15 +76,9 @@ mod tests {
             "Vec2 { x: 0, y: 0 }",
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::StructConstructor(StructConstructor {
-                    ident: Punctuated {
-                        inner: vec![],
-                        last: Some(Box::new(Spanned::new(
-                            Ident {
-                                sym: Spanned::new(Symbol::new("Vec2"), Span::new(0, 4)),
-                                valid: true,
-                            },
-                            Span::new(0, 4),
-                        ))),
+                    ident: Ident {
+                        sym: Spanned::new(Symbol::new("Vec2"), Span::new(0, 4)),
+                        valid: true,
                     }
                     .into(),
                     fields: Spanned::new(

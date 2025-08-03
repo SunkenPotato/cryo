@@ -3,6 +3,7 @@
 use std::ops::{Deref, DerefMut};
 
 use cryo_lexer::{identifier::Identifier, stream::StreamLike};
+use cryo_span::Spanned;
 
 use crate::{Parse, Punctuated, atoms::DoubleColon, ident::Ident};
 
@@ -58,10 +59,21 @@ impl AsRef<Inner> for Path {
     }
 }
 
-#[cfg(test)]
+#[cfg(false)]
 impl From<Inner> for Path {
     fn from(value: Inner) -> Self {
         // unwrapping is ok because this is only on `test`.
         Self::new(value).unwrap()
+    }
+}
+
+impl From<Ident> for Path {
+    fn from(value: Ident) -> Self {
+        Self {
+            inner: Punctuated {
+                inner: vec![],
+                last: Some(Box::new(Spanned::new(value, value.sym.span))),
+            },
+        }
     }
 }
