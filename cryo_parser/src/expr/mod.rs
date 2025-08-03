@@ -326,6 +326,7 @@ mod tests {
     use cryo_span::{Span, Spanned};
 
     use crate::{
+        Punctuated,
         expr::{
             BaseExpr, BinaryExpr, CondExpr, Expr, IfBlock, Operator,
             literal::{IntegerLiteral, Literal},
@@ -710,6 +711,39 @@ mod tests {
                     ),
                 })),
                 Span::new(0, 22),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_field_access_call() {
+        assert_parse(
+            "a.iter()",
+            Spanned::new(
+                Expr::BinaryExpr(BinaryExpr {
+                    lhs: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
+                        sym: Spanned::new(Symbol::new("a"), Span::new(0, 1)),
+                        valid: true,
+                    }))),
+                    op: Spanned::new(Operator::Access, Span::new(1, 2)),
+                    rhs: Box::new(Expr::BaseExpr(BaseExpr::FnCall(FnCall {
+                        func: Box::new(Spanned::new(
+                            Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
+                                sym: Spanned::new(Symbol::new("iter"), Span::new(2, 6)),
+                                valid: true,
+                            })),
+                            Span::new(2, 6),
+                        )),
+                        args: Spanned::new(
+                            Punctuated {
+                                inner: vec![],
+                                last: None,
+                            },
+                            Span::new(7, 7),
+                        ),
+                    }))),
+                }),
+                Span::new(0, 8),
             ),
         );
     }
