@@ -4,6 +4,7 @@
 
 use std::fmt::Debug;
 
+use constructor::StructConstructor;
 use cryo_lexer::{
     TokenType,
     atoms::{Equal, LCurly, LParen, RCurly, RParen},
@@ -20,6 +21,7 @@ use crate::{
     stmt::Stmt,
 };
 
+pub mod constructor;
 pub mod literal;
 
 /// Binary operators.
@@ -125,8 +127,10 @@ pub enum Expr {
 }
 
 impl Expr {
-    fn parse_1(tokens: &mut Guard, min_prec: u8) -> crate::ParseResult<Self> {
-        let mut lhs = tokens.with(BaseExpr::parse).map(Self::BaseExpr)?;
+    fn parse_1<const IF_COND: bool>(tokens: &mut Guard, min_prec: u8) -> crate::ParseResult<Self> {
+        let mut lhs = tokens
+            .with(BaseExpr::parse_1::<IF_COND>)
+            .map(Self::BaseExpr)?;
 
         while let Ok(op) = tokens.with(Operator::parse_1::<false>) {
             if op.precedence() <= min_prec {
@@ -137,7 +141,7 @@ impl Expr {
                 "operator should parse correctly since operator token has already been consumed",
             );
 
-            let rhs = tokens.with(|tokens| Expr::parse_1(tokens, op.precedence()))?;
+            let rhs = tokens.with(|tokens| Expr::parse_1::<IF_COND>(tokens, op.precedence()))?;
 
             lhs = Self::BinaryExpr(BinaryExpr {
                 lhs: Box::new(lhs),
@@ -152,7 +156,7 @@ impl Expr {
 
 impl Parse for Expr {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
-        Self::parse_1(tokens, 0)
+        Self::parse_1::<true>(tokens, 0)
     }
 }
 
@@ -169,6 +173,8 @@ pub enum BaseExpr {
     CondExpr(CondExpr),
     /// A function call.
     FnCall(FnCall),
+    /// A struct constructor.
+    StructConstructor(StructConstructor),
 }
 
 /// A block expression, i.e., a series of statements and a final optional tail expression surrounded by `{` and `}`.
@@ -262,7 +268,7 @@ impl Parse for IfBlock {
             .require(&IF)
             .map_err(|v| ParseError::MissingKw(v.sym.map(|_| IF.with(Clone::clone))))?;
 
-        let cond = Box::new(tokens.spanning(Expr::parse)?);
+        let cond = Box::new(tokens.spanning(|tokens| Expr::parse_1::<false>(tokens, 0))?);
         let block = tokens.spanning(BlockExpr::parse)?;
 
         Ok(Self { cond, block })
@@ -289,34 +295,64 @@ impl Parse for FnCall {
     }
 }
 
-impl Parse for BaseExpr {
-    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
-        tokens
+impl BaseExpr {
+    fn parse_1<const IF_COND: bool>(
+        tokens: &mut cryo_lexer::stream::Guard,
+    ) -> crate::ParseResult<Self> {
+        let mut result = tokens
             .with(Literal::parse)
             .map(Self::Lit)
             .or_else(|_| tokens.with(CondExpr::parse).map(Self::CondExpr))
-            .or_else(|_| tokens.with(BlockExpr::parse).map(Self::BlockExpr))
-            .or_else(|_| {
-                let ident = tokens.spanning(Ident::parse);
+            .or_else(|_| tokens.with(BlockExpr::parse).map(Self::BlockExpr));
 
-                match ident {
-                    Ok(ident) => match tokens.peek_require::<LParen>() {
-                        Ok(_) => {
-                            tokens
-                                .advance()
-                                .expect("LParen token has already been confirmed");
-                            let args = tokens.spanning(Punctuated::parse)?;
-                            tokens.advance_require::<RParen>()?;
-                            Ok(Self::FnCall(FnCall {
-                                func: Box::new(ident.map(Self::BindingUsage).map(Expr::BaseExpr)),
-                                args,
-                            }))
-                        }
-                        Err(_) => Ok(Self::BindingUsage(ident.t)),
-                    },
-                    Err(e) => Err(e),
-                }
-            })
+        if IF_COND {
+            result = result.or_else(|_| {
+                tokens
+                    .with(StructConstructor::parse)
+                    .map(Self::StructConstructor)
+            });
+        }
+        result = result.or_else(|_| {
+            // `tokens.spanning` is unnecessary for `Ident`, but it allows for cleaner code in the match stmt
+            let ident = tokens.spanning(Ident::parse);
+
+            match ident {
+                Ok(ident) => match tokens.peek().map(|v| v.t) {
+                    Ok(TokenType::LParen(_)) => {
+                        tokens
+                            .advance()
+                            .expect("LParen token has already been confirmed");
+                        let args = tokens.spanning(Punctuated::parse)?;
+                        tokens.advance_require::<RParen>()?;
+                        Ok(Self::FnCall(FnCall {
+                            func: Box::new(ident.map(Self::BindingUsage).map(Expr::BaseExpr)),
+                            args,
+                        }))
+                    }
+                    /*Ok(TokenType::LCurly(_)) => {
+                        tokens
+                            .advance()
+                            .expect("LCurly token has already been confirmed");
+                        let fields = tokens.spanning(Punctuated::parse)?;
+                        tokens.advance_require::<RCurly>()?;
+                        Ok(Self::StructConstructor(StructConstructor {
+                            ident: ident.t,
+                            fields,
+                        }))
+                    }*/
+                    _ => Ok(Self::BindingUsage(ident.t)),
+                },
+                Err(e) => Err(e),
+            }
+        });
+
+        result
+    }
+}
+
+impl Parse for BaseExpr {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        Self::parse_1::<false>(tokens)
     }
 }
 

@@ -295,7 +295,6 @@ impl<'stream> StreamLike for Guard<'stream> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(unused_must_use)]
     use cryo_span::Span;
 
     use crate::{
@@ -314,26 +313,28 @@ mod tests {
             Token::new(TokenType::Identifier(Identifier("let".into())), Span::ZERO),
         ]);
 
-        stream.with(|guard| {
-            assert_eq!(
-                guard.advance(),
-                Ok(&Token::new(TokenType::Equal(Equal), Span::ZERO))
-            );
+        stream
+            .with(|guard| {
+                assert_eq!(
+                    guard.advance(),
+                    Ok(&Token::new(TokenType::Equal(Equal), Span::ZERO))
+                );
 
-            assert_eq!(
-                guard.advance(),
-                Ok(&Token::new(TokenType::Semi(Semi), Span::ZERO))
-            );
+                assert_eq!(
+                    guard.advance(),
+                    Ok(&Token::new(TokenType::Semi(Semi), Span::ZERO))
+                );
 
-            assert_eq!(
-                guard.advance(),
-                Ok(&Token::new(
-                    TokenType::Identifier(Identifier("let".into())),
-                    Span::ZERO
-                ))
-            );
+                assert_eq!(
+                    guard.advance(),
+                    Ok(&Token::new(
+                        TokenType::Identifier(Identifier("let".into())),
+                        Span::ZERO
+                    ))
+                );
 
-            Ok::<(), TokenStreamError>(())
-        });
+                Ok::<(), TokenStreamError>(())
+            })
+            .unwrap();
     }
 }
