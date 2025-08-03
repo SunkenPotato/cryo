@@ -118,15 +118,39 @@ mod tests {
                     body: BlockExpr {
                         stmts: Box::new([]),
                         tail: Some(Box::new(Expr::BinaryExpr(BinaryExpr {
-                            lhs: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                sym: Spanned::new(Symbol::new("lhs"), Span::new(35, 38)),
-                                valid: true,
-                            }))),
+                            lhs: Box::new(Expr::BaseExpr(BaseExpr::Path(
+                                Punctuated {
+                                    inner: vec![],
+                                    last: Some(Box::new(Spanned::new(
+                                        Ident {
+                                            sym: Spanned::new(
+                                                Symbol::new("lhs"),
+                                                Span::new(35, 38),
+                                            ),
+                                            valid: true,
+                                        },
+                                        Span::new(35, 38),
+                                    ))),
+                                }
+                                .into(),
+                            ))),
                             op: Spanned::new(crate::expr::Operator::Add, Span::new(39, 40)),
-                            rhs: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                sym: Spanned::new(Symbol::new("rhs"), Span::new(41, 44)),
-                                valid: true,
-                            }))),
+                            rhs: Box::new(Expr::BaseExpr(BaseExpr::Path(
+                                Punctuated {
+                                    inner: vec![],
+                                    last: Some(Box::new(Spanned::new(
+                                        Ident {
+                                            sym: Spanned::new(
+                                                Symbol::new("rhs"),
+                                                Span::new(41, 44),
+                                            ),
+                                            valid: true,
+                                        },
+                                        Span::new(41, 44),
+                                    ))),
+                                }
+                                .into(),
+                            ))),
                         }))),
                     },
                 },

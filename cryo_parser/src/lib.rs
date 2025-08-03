@@ -9,6 +9,7 @@ pub mod atoms;
 pub mod expr;
 pub mod ident;
 pub mod item;
+pub mod path;
 pub mod stmt;
 
 #[cfg(test)]

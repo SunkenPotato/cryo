@@ -18,6 +18,7 @@ use crate::{
     atoms::Comma,
     expr::literal::Literal,
     ident::{ELSE, IF, Ident},
+    path::Path,
     stmt::Stmt,
 };
 
@@ -166,7 +167,7 @@ pub enum BaseExpr {
     /// A literal value.
     Lit(Literal),
     /// A binding usage.
-    BindingUsage(Ident),
+    Path(Path),
     /// A block expression.
     BlockExpr(BlockExpr),
     /// A conditional expression.
@@ -313,10 +314,10 @@ impl BaseExpr {
             });
         }
         result = result.or_else(|_| {
-            // `tokens.spanning` is unnecessary for `Ident`, but it allows for cleaner code in the match stmt
-            let ident = tokens.spanning(Ident::parse);
+            let ident = tokens.spanning(Path::parse);
 
             match ident {
+                // TODO: use peek_require instead
                 Ok(ident) => match tokens.peek().map(|v| v.t) {
                     Ok(TokenType::LParen(_)) => {
                         tokens
@@ -325,22 +326,11 @@ impl BaseExpr {
                         let args = tokens.spanning(Punctuated::parse)?;
                         tokens.advance_require::<RParen>()?;
                         Ok(Self::FnCall(FnCall {
-                            func: Box::new(ident.map(Self::BindingUsage).map(Expr::BaseExpr)),
+                            func: Box::new(ident.map(Self::Path).map(Expr::BaseExpr)),
                             args,
                         }))
                     }
-                    /*Ok(TokenType::LCurly(_)) => {
-                        tokens
-                            .advance()
-                            .expect("LCurly token has already been confirmed");
-                        let fields = tokens.spanning(Punctuated::parse)?;
-                        tokens.advance_require::<RCurly>()?;
-                        Ok(Self::StructConstructor(StructConstructor {
-                            ident: ident.t,
-                            fields,
-                        }))
-                    }*/
-                    _ => Ok(Self::BindingUsage(ident.t)),
+                    _ => Ok(Self::Path(ident.t)),
                 },
                 Err(e) => Err(e),
             }
@@ -560,10 +550,19 @@ mod tests {
                         }),
                         Span::new(2, 17),
                     )]),
-                    tail: Some(Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                        sym: Spanned::new(Symbol::new("x"), Span::new(18, 19)),
-                        valid: true,
-                    })))),
+                    tail: Some(Box::new(Expr::BaseExpr(BaseExpr::Path(
+                        Punctuated {
+                            inner: vec![],
+                            last: Some(Box::new(Spanned::new(
+                                Ident {
+                                    sym: Spanned::new(Symbol::new("x"), Span::new(18, 19)),
+                                    valid: true,
+                                },
+                                Span::new(18, 19),
+                            ))),
+                        }
+                        .into(),
+                    )))),
                 })),
                 Span::new(0, 21),
             ),
@@ -579,10 +578,22 @@ mod tests {
                     if_block: Spanned::new(
                         IfBlock {
                             cond: Box::new(Spanned::new(
-                                Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                    sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
-                                    valid: true,
-                                })),
+                                Expr::BaseExpr(BaseExpr::Path(
+                                    Punctuated {
+                                        inner: vec![],
+                                        last: Some(Box::new(Spanned::new(
+                                            Ident {
+                                                sym: Spanned::new(
+                                                    Symbol::new("f"),
+                                                    Span::new(3, 4),
+                                                ),
+                                                valid: true,
+                                            },
+                                            Span::new(3, 4),
+                                        ))),
+                                    }
+                                    .into(),
+                                )),
                                 Span::new(3, 4),
                             )),
                             block: Spanned::new(
@@ -612,10 +623,22 @@ mod tests {
                     if_block: Spanned::new(
                         IfBlock {
                             cond: Box::new(Spanned::new(
-                                Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                    sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
-                                    valid: true,
-                                })),
+                                Expr::BaseExpr(BaseExpr::Path(
+                                    Punctuated {
+                                        inner: vec![],
+                                        last: Some(Box::new(Spanned::new(
+                                            Ident {
+                                                sym: Spanned::new(
+                                                    Symbol::new("f"),
+                                                    Span::new(3, 4),
+                                                ),
+                                                valid: true,
+                                            },
+                                            Span::new(3, 4),
+                                        ))),
+                                    }
+                                    .into(),
+                                )),
                                 Span::new(3, 4),
                             )),
                             block: Spanned::new(
@@ -632,10 +655,22 @@ mod tests {
                         Box::new([Spanned::new(
                             IfBlock {
                                 cond: Box::new(Spanned::new(
-                                    Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                        sym: Spanned::new(Symbol::new("g"), Span::new(16, 17)),
-                                        valid: true,
-                                    })),
+                                    Expr::BaseExpr(BaseExpr::Path(
+                                        Punctuated {
+                                            inner: vec![],
+                                            last: Some(Box::new(Spanned::new(
+                                                Ident {
+                                                    sym: Spanned::new(
+                                                        Symbol::new("g"),
+                                                        Span::new(16, 17),
+                                                    ),
+                                                    valid: true,
+                                                },
+                                                Span::new(16, 17),
+                                            ))),
+                                        }
+                                        .into(),
+                                    )),
                                     Span::new(16, 17),
                                 )),
                                 block: Spanned::new(
@@ -666,10 +701,22 @@ mod tests {
                     if_block: Spanned::new(
                         IfBlock {
                             cond: Box::new(Spanned::new(
-                                Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                    sym: Spanned::new(Symbol::new("f"), Span::new(3, 4)),
-                                    valid: true,
-                                })),
+                                Expr::BaseExpr(BaseExpr::Path(
+                                    Punctuated {
+                                        inner: vec![],
+                                        last: Some(Box::new(Spanned::new(
+                                            Ident {
+                                                sym: Spanned::new(
+                                                    Symbol::new("f"),
+                                                    Span::new(3, 4),
+                                                ),
+                                                valid: true,
+                                            },
+                                            Span::new(3, 4),
+                                        ))),
+                                    }
+                                    .into(),
+                                )),
                                 Span::new(3, 4),
                             )),
                             block: Spanned::new(
@@ -686,10 +733,22 @@ mod tests {
                         Box::new([Spanned::new(
                             IfBlock {
                                 cond: Box::new(Spanned::new(
-                                    Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                        sym: Spanned::new(Symbol::new("g"), Span::new(16, 17)),
-                                        valid: true,
-                                    })),
+                                    Expr::BaseExpr(BaseExpr::Path(
+                                        Punctuated {
+                                            inner: vec![],
+                                            last: Some(Box::new(Spanned::new(
+                                                Ident {
+                                                    sym: Spanned::new(
+                                                        Symbol::new("g"),
+                                                        Span::new(16, 17),
+                                                    ),
+                                                    valid: true,
+                                                },
+                                                Span::new(16, 17),
+                                            ))),
+                                        }
+                                        .into(),
+                                    )),
                                     Span::new(16, 17),
                                 )),
                                 block: Spanned::new(
@@ -724,10 +783,19 @@ mod tests {
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::FnCall(FnCall {
                     func: Box::new(Spanned::new(
-                        Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                            sym: Spanned::new(Symbol::new("printf"), Span::new(0, 6)),
-                            valid: true,
-                        })),
+                        Expr::BaseExpr(BaseExpr::Path(
+                            Punctuated {
+                                inner: vec![],
+                                last: Some(Box::new(Spanned::new(
+                                    Ident {
+                                        sym: Spanned::new(Symbol::new("printf"), Span::new(0, 6)),
+                                        valid: true,
+                                    },
+                                    Span::new(0, 6),
+                                ))),
+                            }
+                            .into(),
+                        )),
                         Span::new(0, 6),
                     )),
                     args: Spanned::new(
@@ -757,17 +825,35 @@ mod tests {
             "a.iter()",
             Spanned::new(
                 Expr::BinaryExpr(BinaryExpr {
-                    lhs: Box::new(Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                        sym: Spanned::new(Symbol::new("a"), Span::new(0, 1)),
-                        valid: true,
-                    }))),
+                    lhs: Box::new(Expr::BaseExpr(BaseExpr::Path(
+                        Punctuated {
+                            inner: vec![],
+                            last: Some(Box::new(Spanned::new(
+                                Ident {
+                                    sym: Spanned::new(Symbol::new("a"), Span::new(0, 1)),
+                                    valid: true,
+                                },
+                                Span::new(0, 1),
+                            ))),
+                        }
+                        .into(),
+                    ))),
                     op: Spanned::new(Operator::Access, Span::new(1, 2)),
                     rhs: Box::new(Expr::BaseExpr(BaseExpr::FnCall(FnCall {
                         func: Box::new(Spanned::new(
-                            Expr::BaseExpr(BaseExpr::BindingUsage(Ident {
-                                sym: Spanned::new(Symbol::new("iter"), Span::new(2, 6)),
-                                valid: true,
-                            })),
+                            Expr::BaseExpr(BaseExpr::Path(
+                                Punctuated {
+                                    inner: vec![],
+                                    last: Some(Box::new(Spanned::new(
+                                        Ident {
+                                            sym: Spanned::new(Symbol::new("iter"), Span::new(2, 6)),
+                                            valid: true,
+                                        },
+                                        Span::new(2, 6),
+                                    ))),
+                                }
+                                .into(),
+                            )),
                             Span::new(2, 6),
                         )),
                         args: Spanned::new(

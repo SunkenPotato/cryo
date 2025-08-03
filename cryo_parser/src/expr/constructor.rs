@@ -6,7 +6,7 @@ use cryo_lexer::{
 };
 use cryo_span::Spanned;
 
-use crate::{Parse, Punctuated, atoms::Comma, ident::Ident};
+use crate::{Parse, Punctuated, atoms::Comma, ident::Ident, path::Path};
 
 use super::Expr;
 
@@ -16,14 +16,14 @@ use super::Expr;
 #[derive(Debug, PartialEq, Eq)]
 pub struct StructConstructor {
     /// The name of the struct to be constructed.
-    pub ident: Ident,
+    pub ident: Path,
     /// The fields.
     pub fields: Spanned<Punctuated<StructField, Comma>>,
 }
 
 impl Parse for StructConstructor {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
-        let ident = tokens.with(Ident::parse)?;
+        let ident = tokens.with(Path::parse)?;
         tokens.advance_require::<LCurly>()?;
         let fields = tokens.spanning(Punctuated::parse)?;
         tokens.advance_require::<RCurly>()?;
@@ -76,10 +76,17 @@ mod tests {
             "Vec2 { x: 0, y: 0 }",
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::StructConstructor(StructConstructor {
-                    ident: Ident {
-                        sym: Spanned::new(Symbol::new("Vec2"), Span::new(0, 4)),
-                        valid: true,
-                    },
+                    ident: Punctuated {
+                        inner: vec![],
+                        last: Some(Box::new(Spanned::new(
+                            Ident {
+                                sym: Spanned::new(Symbol::new("Vec2"), Span::new(0, 4)),
+                                valid: true,
+                            },
+                            Span::new(0, 4),
+                        ))),
+                    }
+                    .into(),
                     fields: Spanned::new(
                         Punctuated {
                             inner: vec![(

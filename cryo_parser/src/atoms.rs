@@ -57,3 +57,16 @@ atom!(RCurly, RCToken);
 atom!(LParen, LPToken);
 atom!(RParen, RPToken);
 atom!(Semi, SToken);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Parse helper for parsing the `::` atom.
+pub struct DoubleColon;
+
+impl crate::Parse for DoubleColon {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        tokens.advance_require::<ColToken>()?;
+        tokens.advance_require::<ColToken>()?;
+
+        Ok(Self)
+    }
+}
