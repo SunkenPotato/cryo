@@ -317,7 +317,6 @@ impl BaseExpr {
             let ident = tokens.spanning(Path::parse);
 
             match ident {
-                // TODO: use peek_require instead
                 Ok(ident) => match tokens.peek_require::<LParen>() {
                     Ok(_) => {
                         tokens

@@ -6,6 +6,7 @@
 #![expect(private_bounds, incomplete_features)]
 
 pub mod atoms;
+pub mod error;
 pub mod expr;
 pub mod ident;
 pub mod item;
