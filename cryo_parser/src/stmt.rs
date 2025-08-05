@@ -3,7 +3,7 @@
 //! Statements are components of code, that unlike expressions, do not produce a value when evaluated.
 
 use cryo_lexer::{
-    atoms::{Equal, Semi},
+    atoms::{Colon, Equal, Semi},
     stream::{Guard, StreamLike},
 };
 
@@ -11,6 +11,7 @@ use crate::{
     Parse, ParseError,
     expr::Expr,
     ident::{Ident, LET, MUT},
+    item::{Item, Ty},
 };
 
 /// A statement.
@@ -20,6 +21,8 @@ pub enum Stmt {
     ExprSemi(Expr),
     /// A variable binding.
     Binding(Binding),
+    /// An item.
+    Item(Item),
 }
 
 fn parse_expr_semi(tokens: &mut Guard) -> crate::ParseResult<Expr> {
@@ -35,6 +38,26 @@ impl Parse for Stmt {
             .with(parse_expr_semi)
             .map(Self::ExprSemi)
             .or_else(|_| tokens.with(Binding::parse).map(Self::Binding))
+            .or_else(|_| tokens.with(Item::parse).map(Self::Item))
+    }
+}
+
+/// A typed identifier, such as `x: int`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct TypedIdent {
+    /// The name of the identifier.
+    pub ident: Ident,
+    /// The type of this identifier
+    pub id_ty: Ty,
+}
+
+impl Parse for TypedIdent {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        let ident = tokens.with(Ident::parse)?;
+        tokens.advance_require::<Colon>()?;
+        let id_ty = tokens.with(Ty::parse)?;
+
+        Ok(Self { ident, id_ty })
     }
 }
 
@@ -44,7 +67,7 @@ pub struct Binding {
     /// The mutability of this variable.
     pub mutability: Option<Mutable>,
     /// The identifier of this variable.
-    pub ident: Ident,
+    pub ident: TypedIdent,
     /// The expression of this binding.
     pub expr: Expr,
 }
@@ -58,7 +81,7 @@ impl Parse for Binding {
         tokens
             .with(Ident::parse)?
             .require(&LET)
-            .map_err(|_| ParseError::MissingKw(LET.with(Clone::clone)))?;
+            .map_err(|v| ParseError::MissingKw(v.sym.map(|_| LET.with(Clone::clone))))?;
 
         let mutability = match tokens.with(|tokens| {
             let ident = Ident::parse(tokens).map_err(Err)?;
@@ -70,7 +93,7 @@ impl Parse for Binding {
             Err(Err(e)) => return Err(e),
         };
 
-        let ident = tokens.with(Ident::parse)?;
+        let ident = tokens.with(TypedIdent::parse)?;
         tokens.advance_require::<Equal>()?;
         let expr = tokens.with(parse_expr_semi)?;
         Ok(Binding {
@@ -95,30 +118,37 @@ mod tests {
         test_util::assert_parse,
     };
 
-    use super::{Binding, Mutable, Stmt};
+    use super::{Binding, Mutable, Stmt, TypedIdent};
 
     #[test]
     fn parse_immut_binding() {
         assert_parse(
-            "let x = 5 + 5;",
+            "let x: int = 5 + 5;",
             Spanned::new(
                 Stmt::Binding(Binding {
                     mutability: None,
-                    ident: Ident {
-                        sym: Symbol::new("x"),
-                        valid: true,
+                    ident: TypedIdent {
+                        ident: Ident {
+                            sym: Spanned::new(Symbol::new("x"), Span::new(4, 5)),
+                            valid: true,
+                        },
+                        id_ty: Ident {
+                            sym: Spanned::new(Symbol::new("int"), Span::new(7, 10)),
+                            valid: true,
+                        }
+                        .into(),
                     },
                     expr: Expr::BinaryExpr(BinaryExpr {
                         lhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(5),
+                            Spanned::new(IntegerLiteral::Value(5), Span::new(13, 14)),
                         )))),
-                        op: Operator::Add,
+                        op: Spanned::new(Operator::Add, Span::new(15, 16)),
                         rhs: Box::new(Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
-                            IntegerLiteral::Value(5),
+                            Spanned::new(IntegerLiteral::Value(5), Span::new(17, 18)),
                         )))),
                     }),
                 }),
-                Span::new(0, 14),
+                Span::new(0, 19),
             ),
         );
     }
@@ -126,19 +156,27 @@ mod tests {
     #[test]
     fn parse_mut_binding() {
         assert_parse(
-            "let mut x = 5;",
+            "let mut x: int = 5;",
             Spanned::new(
                 Stmt::Binding(Binding {
                     mutability: Some(Mutable),
-                    ident: Ident {
-                        sym: Symbol::new("x"),
-                        valid: true,
+                    ident: TypedIdent {
+                        ident: Ident {
+                            sym: Spanned::new(Symbol::new("x"), Span::new(8, 9)),
+                            valid: true,
+                        },
+                        id_ty: Ident {
+                            sym: Spanned::new(Symbol::new("int"), Span::new(11, 14)),
+                            valid: true,
+                        }
+                        .into(),
                     },
-                    expr: Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(
+                    expr: Expr::BaseExpr(BaseExpr::Lit(Literal::IntegerLiteral(Spanned::new(
                         IntegerLiteral::Value(5),
-                    ))),
+                        Span::new(17, 18),
+                    )))),
                 }),
-                Span::new(0, 14),
+                Span::new(0, 19),
             ),
         );
     }

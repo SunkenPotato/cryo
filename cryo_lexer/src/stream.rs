@@ -6,7 +6,8 @@
 
 use std::fmt::Debug;
 
-use crate::{Token, TokenType};
+use crate::Token;
+use cryo_span::{Span, Spanned};
 pub use guard::Guard;
 
 /// A token stream.
@@ -32,7 +33,7 @@ impl TokenStream {
 
     // so that tests do not have to interact with the lexer.
     //#[cfg(test)]
-    #[allow(missing_docs)]
+    #[expect(missing_docs)]
     pub fn new(s: impl IntoIterator<Item = Token>) -> Self {
         Self {
             inner: s.into_iter().collect(),
@@ -78,7 +79,17 @@ pub enum TokenStreamError {
     /// An unexpected end of input was reached.
     EndOfInput,
     /// The token type the caller requested did not match the matching token.
-    IncorrectToken(TokenType),
+    IncorrectToken(Token),
+}
+
+impl TokenStreamError {
+    /// Get the span of this error. In the case of [`TokenStreamError::EndOfInput`], this will always be `Span::ZERO`.
+    pub const fn span(&self) -> Span {
+        match self {
+            Self::EndOfInput => Span::ZERO,
+            Self::IncorrectToken(v) => v.span,
+        }
+    }
 }
 
 mod guard {
@@ -113,16 +124,27 @@ mod guard {
         /// Returns [`TokenStreamError::IncorrectToken`] if the token was not able to be converted to `T`.
         ///
         /// See also [`TokenStreamGuard::advance`].
-        #[track_caller]
-        pub fn advance_require<T: TokenLike>(&mut self) -> Result<Spanned<&T>, TokenStreamError> {
-            self.stream
+        #[cfg_attr(test, track_caller)]
+        pub fn advance_require<T: TokenLike>(&mut self) -> Result<Spanned<T>, TokenStreamError> {
+            let v = self
+                .stream
                 .get(*self.cursor)
                 .ok_or(TokenStreamError::EndOfInput)
-                .and_then(|v| {
-                    v.require::<T>()
-                        .ok_or(TokenStreamError::IncorrectToken(v.t))
-                })
-                .inspect(|_| *self.cursor += 1)
+                .and_then(|v| v.require::<T>().ok_or(TokenStreamError::IncorrectToken(*v)))
+                .inspect(|_| *self.cursor += 1);
+
+            #[cfg(test)]
+            #[expect(unused_must_use)]
+            v.as_ref().inspect_err(|e| {
+                eprintln!(
+                    "{} requested `{}`, got {:?} instead.",
+                    core::panic::Location::caller(),
+                    core::any::type_name::<T>(),
+                    e
+                )
+            });
+
+            v
         }
 
         /// Peek at the next token in the stream. This function will not advance the stream, so calling it multiple times will result in the same outcome.
@@ -131,12 +153,12 @@ mod guard {
         }
 
         /// Peek at the next token and require it to be of `T`. This function is equivalent to `Guard::peek().and_then(|v| v.require::<T>())`.
-        pub fn peek_require<T>(&self) -> Result<Spanned<&T>, TokenStreamError>
+        pub fn peek_require<T>(&self) -> Result<Spanned<T>, TokenStreamError>
         where
             T: TokenLike,
         {
             self.peek()
-                .and_then(|v| v.require().ok_or(TokenStreamError::IncorrectToken(v.t)))
+                .and_then(|v| v.require().ok_or(TokenStreamError::IncorrectToken(*v)))
         }
 
         /// Peek at the nth token in this stream.
@@ -147,12 +169,12 @@ mod guard {
         }
 
         /// Peek at the nth token and require it to be of `T`. This function is equivalent to `Guard::peek().and_then(|v| v.require::<T>())`.
-        pub fn peek_nth_require<T>(&self, n: usize) -> Result<Spanned<&T>, TokenStreamError>
+        pub fn peek_nth_require<T>(&self, n: usize) -> Result<Spanned<T>, TokenStreamError>
         where
             T: TokenLike,
         {
             self.peek_nth(n)
-                .and_then(|v| v.require().ok_or(TokenStreamError::IncorrectToken(v.t)))
+                .and_then(|v| v.require().ok_or(TokenStreamError::IncorrectToken(*v)))
         }
 
         /// Peek at the next `N` tokens in this stream.
@@ -175,45 +197,28 @@ trait Sealed {}
 impl<T, E> Sealed for Result<T, E> {}
 impl<T> Sealed for Option<T> {}
 
-#[diagnostic::on_unimplemented(
-    message = "it is not known whether this type can represent a success or a failure"
-)]
-trait Fails: Sealed {
-    fn is_fail(&self) -> bool;
-}
-
-impl<T, E> Fails for Result<T, E> {
-    fn is_fail(&self) -> bool {
-        self.is_err()
-    }
-}
-
-impl<T> Fails for Option<T> {
-    fn is_fail(&self) -> bool {
-        self.is_none()
-    }
-}
-
 /// Provides common behavior for creating a stream guard.
-#[allow(private_bounds)]
+#[expect(private_bounds)]
 pub trait StreamLike: Sealed {
     /// Grant access to a [`Guard`], providing a save-discard-like system, where if the closure returns `Result::Ok`, the
     /// changes applied to the guard inside the closure are committed, else discarded.
-    fn with<F, R>(&mut self, f: F) -> R
+    fn with<F, T, E>(&mut self, f: F) -> Result<T, E>
     where
-        R: Fails,
-        F: FnOnce(&mut Guard) -> R;
+        F: FnOnce(&mut Guard) -> Result<T, E>;
+
+    /// Equivalent to `with`, except that this wraps the `Ok` value in a [`Spanned`] which has the span of all the tokens consumed.
+    fn spanning<F, T, E>(&mut self, f: F) -> Result<Spanned<T>, E>
+    where
+        F: FnOnce(&mut Guard) -> Result<T, E>;
 }
 
 impl Sealed for TokenStream {}
 impl Sealed for Guard<'_> {}
 
 impl StreamLike for TokenStream {
-    #[allow(private_bounds)]
-    fn with<F, R>(&mut self, f: F) -> R
+    fn with<F, T, E>(&mut self, f: F) -> Result<T, E>
     where
-        R: Fails,
-        F: FnOnce(&mut Guard) -> R,
+        F: FnOnce(&mut Guard) -> Result<T, E>,
     {
         let mut cursor_copy = self.cursor;
         let mut guard = Guard {
@@ -223,20 +228,31 @@ impl StreamLike for TokenStream {
 
         let result = f(&mut guard);
 
-        if !result.is_fail() {
+        if result.is_ok() {
             self.cursor = cursor_copy;
         }
 
         result
     }
+
+    fn spanning<F, T, E>(&mut self, f: F) -> Result<Spanned<T>, E>
+    where
+        F: FnOnce(&mut Guard) -> Result<T, E>,
+    {
+        let cursor_before = self.cursor;
+        let result = self.with(f)?;
+        let final_span = self.inner[cursor_before..self.cursor()]
+            .iter()
+            .fold(self.inner[cursor_before].span, |b, token| b + token.span);
+
+        Ok(Spanned::new(result, final_span))
+    }
 }
 
 impl<'stream> StreamLike for Guard<'stream> {
-    #[allow(private_bounds)]
-    fn with<F, R>(&mut self, f: F) -> R
+    fn with<F, T, E>(&mut self, f: F) -> Result<T, E>
     where
-        R: Fails,
-        F: FnOnce(&mut Guard) -> R,
+        F: FnOnce(&mut Guard) -> Result<T, E>,
     {
         let mut cursor_copy = *self.cursor;
         let mut guard = Guard {
@@ -246,17 +262,39 @@ impl<'stream> StreamLike for Guard<'stream> {
 
         let result = f(&mut guard);
 
-        if !result.is_fail() {
+        if result.is_ok() {
             *self.cursor = cursor_copy;
         }
 
         result
     }
+
+    fn spanning<F, T, E>(&mut self, f: F) -> Result<Spanned<T>, E>
+    where
+        F: FnOnce(&mut Guard) -> Result<T, E>,
+    {
+        let cursor_before = *self.cursor;
+        let result = self.with(f)?;
+        let final_span = if cursor_before == *self.cursor {
+            let st = if cursor_before > 0 {
+                self.stream[cursor_before - 1].span.stop
+            } else {
+                0
+            };
+
+            Span::new(st, st)
+        } else {
+            self.stream[cursor_before..*self.cursor]
+                .iter()
+                .fold(self.stream[cursor_before].span, |b, token| b + token.span)
+        };
+
+        Ok(Spanned::new(result, final_span))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    #![allow(unused_must_use)]
     use cryo_span::Span;
 
     use crate::{
@@ -275,26 +313,28 @@ mod tests {
             Token::new(TokenType::Identifier(Identifier("let".into())), Span::ZERO),
         ]);
 
-        stream.with(|guard| {
-            assert_eq!(
-                guard.advance(),
-                Ok(&Token::new(TokenType::Equal(Equal), Span::ZERO))
-            );
+        stream
+            .with(|guard| {
+                assert_eq!(
+                    guard.advance(),
+                    Ok(&Token::new(TokenType::Equal(Equal), Span::ZERO))
+                );
 
-            assert_eq!(
-                guard.advance(),
-                Ok(&Token::new(TokenType::Semi(Semi), Span::ZERO))
-            );
+                assert_eq!(
+                    guard.advance(),
+                    Ok(&Token::new(TokenType::Semi(Semi), Span::ZERO))
+                );
 
-            assert_eq!(
-                guard.advance(),
-                Ok(&Token::new(
-                    TokenType::Identifier(Identifier("let".into())),
-                    Span::ZERO
-                ))
-            );
+                assert_eq!(
+                    guard.advance(),
+                    Ok(&Token::new(
+                        TokenType::Identifier(Identifier("let".into())),
+                        Span::ZERO
+                    ))
+                );
 
-            Ok::<(), TokenStreamError>(())
-        });
+                Ok::<(), TokenStreamError>(())
+            })
+            .unwrap();
     }
 }

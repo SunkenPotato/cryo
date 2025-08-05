@@ -11,10 +11,10 @@ macro_rules! token_marker {
         impl $crate::Sealed for $type {}
 
         impl $crate::TokenLike for $type {
-            fn from_token(token: &$crate::Token) -> Option<::cryo_span::Spanned<&Self>> {
+            fn from_token(token: &$crate::Token) -> Option<::cryo_span::Spanned<Self>> {
                 match token.t {
                     $crate::TokenType::$type(ref v) => {
-                        Some(::cryo_span::Spanned::new(v, token.span))
+                        Some(::cryo_span::Spanned::new(*v, token.span))
                     }
                     _ => None,
                 }
@@ -49,7 +49,7 @@ pub type Token = Spanned<TokenType>;
 /// Extension trait for `Spanned<TokenType>` (a.k.a., [`Token`]).
 pub trait TokenExt {
     /// Attempt to reinterpret `self` as `T` using [`FromToken`].
-    fn require<T: TokenLike>(&self) -> Option<Spanned<&T>>;
+    fn require<T: TokenLike>(&self) -> Option<Spanned<T>>;
     /// Checks whether `self` can be reinterpreted as `T`.
     fn is<T: TokenLike>(&self) -> bool {
         self.require::<T>().is_some()
@@ -58,7 +58,7 @@ pub trait TokenExt {
 
 impl TokenExt for Token {
     #[track_caller]
-    fn require<T: TokenLike>(&self) -> Option<Spanned<&T>> {
+    fn require<T: TokenLike>(&self) -> Option<Spanned<T>> {
         T::from_token(self)
     }
 }
@@ -103,7 +103,6 @@ trait Lex: Sized {
 }
 
 /// The possible types a token may be. `'source` refers to the lifetime of the input given to the parser.
-// TODO: overflow subtypes into this to avoid nesting
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     /// An identifier.
@@ -161,10 +160,10 @@ pub enum TokenType {
 trait Sealed {}
 
 /// Trait for attempting to convert `Token`s into concrete types.
-#[allow(private_bounds)]
-pub trait TokenLike: Sealed {
+#[expect(private_bounds)]
+pub trait TokenLike: Sealed + Sized {
     /// Attempt to convert a given token into `Self`.
-    fn from_token(token: &Token) -> Option<Spanned<&Self>>;
+    fn from_token(token: &Token) -> Option<Spanned<Self>>;
 }
 
 impl TokenType {

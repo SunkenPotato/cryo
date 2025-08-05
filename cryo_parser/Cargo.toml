@@ -9,7 +9,6 @@ workspace = true
 [dependencies]
 cryo_lexer = { version = "0.1.0", path = "../cryo_lexer" }
 cryo_span = { version = "0.1.0", path = "../cryo_span" }
-itertools = "0.14.0"
 paste = "1.0.15"
 internment = "0.8.6"
 derive_more = { version = "2.0.1", features = ["from", "into"] }

@@ -11,6 +11,8 @@ use cryo_lexer::{
     stream::Guard,
 };
 
+use crate::ParseError;
+
 struct Assert<const COND: bool>;
 
 #[diagnostic::on_unimplemented(
@@ -20,16 +22,16 @@ trait True {}
 
 impl True for Assert<true> {}
 
-fn atom<S, T>(tokens: &mut Guard) -> Option<S>
+fn atom<S, T>(tokens: &mut Guard) -> Result<S, ParseError>
 where
     T: TokenLike,
     Assert<{ size_of::<T>() == 0 }>: True,
     Assert<{ size_of::<S>() == 0 }>: True,
 {
-    tokens.advance_require::<T>().ok()?;
+    tokens.advance_require::<T>()?;
 
     // SAFETY: we have checked the size of S and T with the constant generic expressions guaranteeing that they are ZSTs and therefore, zero patterns are valid for them.
-    unsafe { Some(::core::mem::zeroed()) }
+    unsafe { Ok(::core::mem::zeroed()) }
 }
 
 macro_rules! atom {
@@ -38,9 +40,8 @@ macro_rules! atom {
         #[doc = concat!("Parse helper for parsing the ", stringify!($name), " atom.")]
         pub struct $name;
 
-        impl $name {
-            /// Parse this atom or return `None`.
-            pub fn parse(tokens: &mut Guard) -> Option<Self> {
+        impl crate::Parse for $name {
+            fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
                 atom::<Self, $from>(tokens)
             }
         }
@@ -56,3 +57,16 @@ atom!(RCurly, RCToken);
 atom!(LParen, LPToken);
 atom!(RParen, RPToken);
 atom!(Semi, SToken);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Parse helper for parsing the `::` atom.
+pub struct DoubleColon;
+
+impl crate::Parse for DoubleColon {
+    fn parse(tokens: &mut Guard) -> crate::ParseResult<Self> {
+        tokens.advance_require::<ColToken>()?;
+        tokens.advance_require::<ColToken>()?;
+
+        Ok(Self)
+    }
+}

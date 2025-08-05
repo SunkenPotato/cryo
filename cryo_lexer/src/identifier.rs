@@ -70,9 +70,9 @@ impl Lex for Identifier {
 }
 
 impl TokenLike for Identifier {
-    fn from_token(token: &Token) -> Option<Spanned<&Self>> {
+    fn from_token(token: &Token) -> Option<Spanned<Self>> {
         match token.t {
-            TokenType::Identifier(ref id) => Some(Spanned::new(id, token.span)),
+            TokenType::Identifier(ref id) => Some(Spanned::new(*id, token.span)),
             _ => None,
         }
     }

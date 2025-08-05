@@ -3,6 +3,7 @@
 use std::thread::LocalKey;
 
 use cryo_lexer::{Symbol, identifier::Identifier};
+use cryo_span::Spanned;
 
 use crate::Parse;
 
@@ -24,14 +25,18 @@ keywords! {
     LET = let,
     MUT = mut,
     IF = if,
-    ELSE = else
+    ELSE = else,
+    FUN = fun,
+    STRUCT = struct,
+    ENUM = enum,
+    UNION = union
 }
 
 /// A validated identifier, that is, one proven not to be a keyword.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Ident {
     /// The actual identifier.
-    pub sym: Symbol,
+    pub sym: Spanned<Symbol>,
     /// Represents whether this identifier is valid or not.
     pub valid: bool,
 }
@@ -65,15 +70,15 @@ impl Ident {
     }
 }
 
-impl From<Identifier> for Ident {
-    fn from(ident: Identifier) -> Self {
+impl From<Spanned<Identifier>> for Ident {
+    fn from(ident: Spanned<Identifier>) -> Self {
         KEYWORDS.with(|keywords| match keywords.iter().find(|v| **v == ident.0) {
-            Some(v) => Self {
-                sym: *v,
+            Some(_) => Self {
+                sym: ident.map(|v| v.0),
                 valid: false,
             },
             None => Self {
-                sym: ident.0,
+                sym: ident.map(|v| v.0),
                 valid: true,
             },
         })
@@ -84,7 +89,7 @@ impl Parse for Ident {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
         let ident = tokens.advance_require::<Identifier>()?;
 
-        Ok(Self::from(*ident.t))
+        Ok(Self::from(ident))
     }
 }
 
@@ -101,7 +106,7 @@ mod tests {
             "let",
             Spanned::new(
                 Ident {
-                    sym: Symbol::new("let"),
+                    sym: Spanned::new(Symbol::new("let"), Span::new(0, 3)),
                     valid: false,
                 },
                 Span::new(0, 3),
