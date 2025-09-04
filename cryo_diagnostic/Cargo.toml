@@ -1,0 +1,12 @@
+[package]
+name = "cryo_diagnostic"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cryo_span = { version = "0.1.0", path = "../cryo_span" }
+yansi = "1.0.1"
+similar = { version = "2.7.0", features = ["text"] }
+
+[lints]
+workspace = true

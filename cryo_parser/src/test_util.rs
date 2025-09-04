@@ -1,37 +1,39 @@
-#![allow(unexpected_cfgs)]
-
 use std::fmt::Debug;
 
-#[cfg(timed)]
-use std::time::Instant;
-
-use cryo_lexer::stream::{StreamLike, TokenStream};
+use cryo_diagnostic::SourceFile;
+use cryo_lexer::{Lexer, stream::StreamLike};
 use cryo_span::Spanned;
 
-use crate::Parse;
+use crate::{Parse, ParseError};
 
-#[track_caller]
-pub fn assert_parse<I, T>(input: I, expect: Spanned<T>)
+#[expect(unused)]
+pub fn assert_parse<T>(input: &str, expected: Spanned<T>)
 where
-    I: TryInto<TokenStream>,
-    I::Error: Debug,
     T: Parse + Debug + PartialEq,
 {
-    let mut stream: TokenStream = input.try_into().unwrap();
-    #[cfg(timed)]
-    let start_time = Instant::now();
-    let Spanned { t, span } = stream.spanning(T::parse).unwrap();
-    #[cfg(timed)]
-    {
-        let end_time = Instant::now();
-        let duration = end_time.duration_since(start_time);
-        eprintln!(
-            "`{}` took {}μs to parse.",
-            ::core::any::type_name::<T>(),
-            duration.as_micros(),
-        );
+    let lexer = Lexer::new(SourceFile::Memory(input.to_owned().into_boxed_str()));
+    let (_, mut stream) = lexer.lex().expect("input should be valid");
+
+    match stream.spanning(T::parse) {
+        Ok(v) => {
+            assert_eq!(v, expected)
+        }
+        Err(e) => {
+            panic!("failed to parse {}", ::core::any::type_name::<T>())
+        }
     }
-    assert_eq!(t, expect.t);
-    assert_eq!(span, expect.span);
-    assert!(stream.remaining().is_empty())
+}
+
+#[expect(unused)]
+pub fn assert_parse_fail<T>(input: &str, expected: ParseError)
+where
+    T: Parse + Debug,
+{
+    let lexer = Lexer::new(SourceFile::Memory(input.to_owned().into_boxed_str()));
+    let (_, mut stream) = lexer.lex().expect("input should be valid");
+
+    match stream.spanning(T::parse) {
+        Ok(v) => panic!("parse succeeded: {v:?}"),
+        Err(e) => assert_eq!(e, expected),
+    }
 }

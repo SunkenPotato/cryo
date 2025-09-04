@@ -1,8 +1,10 @@
 //! Spans for the `cryo` language.
 //!
 //! A span declares a range inside a file.
-
-use std::ops::{Add, AddAssign, Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    str::Lines,
+};
 
 /// A span.
 ///
@@ -43,21 +45,19 @@ impl Span {
 
         self
     }
-}
 
-impl Add for Span {
-    type Output = Self;
-    fn add(mut self, rhs: Self) -> Self::Output {
-        if rhs.stop >= self.stop {
-            self.stop = rhs.stop;
-        }
-        self
+    /// Check whether a given [`Span`] would "fit" inside this span, i.e. whether the contents of `other` are a subset of those of `self`.
+    pub const fn contains(self, other: Self) -> bool {
+        self.start <= other.start && self.stop >= other.start
     }
-}
 
-impl AddAssign for Span {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
+    /// Extend this span by another span. This will, if `other.stop >= self.stop`, set the current span's `stop` to that of `other`.
+    pub const fn extend(mut self, other: Self) -> Self {
+        if other.stop >= self.stop {
+            self.stop = other.stop
+        }
+
+        self
     }
 }
 
@@ -98,9 +98,9 @@ impl<T> Spanned<T> {
 
     /// Extend the inner span by the given span.
     ///
-    /// This method is equivalent to adding `span` to the inner ]`Span`].
+    /// This method is equivalent to calling setting the inner span to the one returned by `Span::extend(span)`.
     pub fn extend(mut self, span: Span) -> Self {
-        self.span += span;
+        self.span = self.span.extend(span);
         self
     }
 
@@ -151,4 +151,33 @@ impl<T> DerefMut for Spanned<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.t
     }
+}
+
+/// An iterator over the lines of something, with a span.
+pub struct SpannedLines<'a> {
+    inner: Lines<'a>,
+    curr: u32,
+}
+
+impl<'a> Iterator for SpannedLines<'a> {
+    type Item = Spanned<&'a str>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|v| {
+            let new_curr = self.curr + v.len() as u32;
+            let s = Spanned::new(v, Span::new(self.curr, new_curr));
+            self.curr = new_curr;
+            s
+        })
+    }
+}
+
+/// Behaviour for obtaining source information from a [`Span`].
+pub trait SpanIndexable {
+    /// The source of this span. If this span is out of bounds, this should return `None`.
+    fn source(&self, span: Span) -> Option<&str>;
+    /// The line and column of this offset.
+    fn line_col(&self, offset: u32) -> (u32, u32);
+    /// The source file that this data type got its contents from.
+    fn file(&self) -> &str;
 }

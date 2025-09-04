@@ -10,6 +10,7 @@ workspace = true
 paste = "*"
 
 [dependencies]
-cryo_intern = { version = "0.1.0", path = "../cryo_intern" }
+cryo_diagnostic = { version = "0.1.0", path = "../cryo_diagnostic" }
 cryo_span = { version = "0.1.0", path = "../cryo_span" }
+internment = "0.8.6"
 sealed_trait = "0.1.1"

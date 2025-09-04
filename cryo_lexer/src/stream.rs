@@ -243,7 +243,9 @@ impl StreamLike for TokenStream {
         let result = self.with(f)?;
         let final_span = self.inner[cursor_before..self.cursor()]
             .iter()
-            .fold(self.inner[cursor_before].span, |b, token| b + token.span);
+            .fold(self.inner[cursor_before].span, |b, token| {
+                b.extend(token.span)
+            });
 
         Ok(Spanned::new(result, final_span))
     }
@@ -286,7 +288,9 @@ impl<'stream> StreamLike for Guard<'stream> {
         } else {
             self.stream[cursor_before..*self.cursor]
                 .iter()
-                .fold(self.stream[cursor_before].span, |b, token| b + token.span)
+                .fold(self.stream[cursor_before].span, |b, token| {
+                    b.extend(token.span)
+                })
         };
 
         Ok(Spanned::new(result, final_span))

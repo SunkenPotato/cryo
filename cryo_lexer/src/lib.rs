@@ -30,8 +30,9 @@ pub mod stream;
 
 use std::fmt::Display;
 
-use cryo_intern::InternStr;
+use cryo_diagnostic::SourceFile;
 use cryo_span::{Span, Spanned};
+use internment::Intern;
 
 use crate::{
     atoms::{
@@ -64,13 +65,14 @@ impl TokenExt for Token {
 }
 
 type LexFn = fn(&str) -> Result<(Token, &str), LexicalError>;
+
 /// An error returned by the lexer.
 pub type LexicalError = Spanned<LexicalErrorKind>;
 
 /// A symbol.
 ///
 /// A symbol represents an interned slice of input.
-pub type Symbol = InternStr;
+pub type Symbol = Intern<str>;
 
 /// Split an input string while the supplied function returns `false`.
 pub fn extract(s: &str, f: impl Fn(char) -> bool) -> (&str, &str) {
@@ -204,7 +206,7 @@ impl Lex for TokenType {
 }
 
 /// Errors that may occur during lexing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexicalErrorKind {
     /// An expected sequence was not found.
     SequenceNotFound(&'static str),
@@ -233,11 +235,49 @@ impl Display for LexicalErrorKind {
     }
 }
 
+/// An error returned by the lexer. This differs from [`LexicalError`], as it may also be an I/O error.
+#[derive(Debug)]
+pub enum LexerError {
+    /// A lexical error.
+    LexicalError(LexicalError),
+    /// An I/O error.
+    Io(std::io::Error),
+}
+
+/// The lexer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Lexer {
+    /// The source from which it should pull contents from.
+    pub source: SourceFile,
+}
+
+impl Lexer {
+    /// Create a new lexer with the given source.
+    pub const fn new(source: SourceFile) -> Self {
+        Self { source }
+    }
+
+    /// Consume the content supplied by the inner [`SourceFile`] and attempt to create a [`TokenStream`].
+    pub fn lex(self) -> Result<(SourceFile, TokenStream), LexerError> {
+        let source = match self.source.clone().contents() {
+            Ok(v) => v,
+            Err(e) => return Err(LexerError::Io(e)),
+        };
+
+        let stream = match lexer(&source) {
+            Ok(v) => v,
+            Err(e) => return Err(LexerError::LexicalError(e)),
+        };
+
+        Ok((self.source, stream))
+    }
+}
+
 /// The whole point.
 ///
 /// The function will attempt to convert the supplied input into tokens and return a [`TokenStream`] which can be used to inspect the tokens generated. \
 /// If it fails, the function will return a spanned [`LexicalError`] pointing to where the erroneous input is.
-pub fn lexer(input: &str) -> Result<TokenStream, LexicalError> {
+fn lexer(input: &str) -> Result<TokenStream, LexicalError> {
     let mut tokens = vec![];
     let mut loop_input = input.trim();
     let mut cursor = input.len() - loop_input.len();
@@ -263,7 +303,7 @@ pub fn lexer(input: &str) -> Result<TokenStream, LexicalError> {
     Ok(TokenStream::new(tokens))
 }
 
-impl TryInto<TokenStream> for &'_ str {
+impl TryInto<TokenStream> for &str {
     type Error = LexicalError;
 
     fn try_into(self) -> Result<TokenStream, Self::Error> {

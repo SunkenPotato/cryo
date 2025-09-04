@@ -1,13 +1,11 @@
 use std::{backtrace::Backtrace, panic::PanicHookInfo};
 
 use cryo_lexer::LexicalError;
-use cryo_parser::ParseError;
 
 #[derive(Debug)]
 #[expect(unused)]
 pub enum CompileError {
     LexicalError(LexicalError),
-    ParseError(ParseError),
 }
 
 pub fn set_panic_hook() {
