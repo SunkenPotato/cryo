@@ -5,6 +5,7 @@
 mod test_util;
 
 pub mod expr;
+pub mod ident;
 
 use cryo_diagnostic::{Diagnostics, SourceFile};
 use cryo_lexer::{
