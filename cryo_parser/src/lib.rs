@@ -12,7 +12,7 @@ use cryo_lexer::{
     Token, TokenKind,
     stream::{Guard, TokenStream, TokenStreamError},
 };
-use cryo_span::{HasSpan, Span};
+use cryo_span::Span;
 
 /// The result of a parser.
 pub type ParseResult<T> = Result<T, ParseError>;
@@ -58,6 +58,8 @@ pub enum ParseErrorKind {
     },
     /// Unexpected EOF.
     EndOfInput(Span),
+    /// An unclosed delimiter was parsed.
+    UnclosedDelimiter(TokenKind),
 }
 
 /// Utility for storing either one expected token kind or multiple in the form of a static slice.
@@ -96,15 +98,6 @@ impl From<TokenStreamError> for ParseError {
                     expected: ExpectedToken::Owned(expected),
                 },
             },
-        }
-    }
-}
-
-impl HasSpan for ParseErrorKind {
-    fn span(&mut self) -> &mut Span {
-        match self {
-            Self::IncorrectToken { got, .. } => &mut got.span,
-            Self::EndOfInput(s) => s,
         }
     }
 }

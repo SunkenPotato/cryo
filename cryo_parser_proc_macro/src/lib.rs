@@ -70,7 +70,7 @@ fn derive_is_fail_enum(input: DeriveInput) -> syn::Result<TokenStream2> {
                     fn is_fail(&self) -> bool {
                         match self {
                             #(
-                                Self::#idents(v) => IsFail::is_fail(v)
+                                Self::#idents(v) => v.is_fail()
                             ),*
                         }
                     }

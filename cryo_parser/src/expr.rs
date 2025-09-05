@@ -4,7 +4,9 @@ use cryo_lexer::{TokenKind, stream::StreamLike};
 use cryo_parser_proc_macro::IsFail;
 use cryo_span::Spanned;
 
-use crate::{ExpectedToken, IsFail, Parse, ParseError, ParseErrorKind, expr::literal::Literal};
+use crate::{
+    ExpectedToken, IsFail, Parse, ParseError, ParseErrorKind, expr::literal::Literal, ident::Ident,
+};
 
 /// An operator for a binary operator.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, IsFail)]
@@ -69,6 +71,12 @@ pub struct BinaryExpr {
 pub enum BaseExpr {
     /// A literal expression.
     Literal(Literal),
+    /// A binding usage.
+    Binding(Ident),
+    /// A unary expression.
+    UnaryExpr(Unary),
+    /// A parenthesized expression.
+    Parenthesized(Box<Expr>),
 }
 
 /// An expression.
@@ -79,6 +87,31 @@ pub enum Expr {
     BinaryExpr(BinaryExpr),
     /// A base expression.
     BaseExpr(BaseExpr),
+}
+
+/// A unary expression.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unary {
+    /// The operator.
+    pub op: Spanned<UnaryOp>,
+    /// The expression.
+    pub expr: Box<Spanned<BaseExpr>>,
+}
+
+/// A unary operator, used in unary expressions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, IsFail)]
+#[fail = false]
+pub enum UnaryOp {
+    /// The `!` operator.
+    Not,
+    /// The `-` operator.
+    Neg,
+}
+
+impl IsFail for Unary {
+    fn is_fail(&self) -> bool {
+        self.op.is_fail() && self.expr.is_fail()
+    }
 }
 
 ////////////////////////////////////
@@ -121,7 +154,35 @@ impl Parse for BinaryOp {
 
 impl Parse for BaseExpr {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
-        tokens.with(Literal::parse).map(Self::Literal)
+        if let Ok(l_paren) = tokens.advance_require(TokenKind::LParen) {
+            let expr = tokens.with(Expr::parse)?;
+            match tokens.advance_require(TokenKind::RParen) {
+                Ok(_) => Ok(Self::Parenthesized(Box::new(expr))),
+                Err(e) => Err(ParseError {
+                    span: e.span(),
+                    context: l_paren.span.extend(e.span()),
+                    kind: ParseErrorKind::UnclosedDelimiter(TokenKind::LParen),
+                }),
+            }
+        } else {
+            Self::parse_1(tokens)
+        }
+    }
+}
+
+impl BaseExpr {
+    fn parse_1(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        if let Ok(op) = tokens.spanning(UnaryOp::parse) {
+            return Ok(Self::UnaryExpr(Unary {
+                op,
+                expr: Box::new(tokens.spanning(Self::parse)?),
+            }));
+        }
+
+        tokens
+            .with(Literal::parse)
+            .map(Self::Literal)
+            .or_else(|_| tokens.with(Ident::parse).map(Self::Binding))
     }
 }
 
@@ -178,6 +239,29 @@ impl Expr {
 impl Parse for Expr {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
         Self::parse_1(tokens, 0)
+    }
+}
+
+impl UnaryOp {
+    /// A list of tokens accepted by the [`UnaryOp`] parser.
+    pub const ACCEPTED_TOKENS: &[TokenKind] = &[TokenKind::Bang];
+}
+
+impl Parse for UnaryOp {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        let token = tokens.advance()?;
+        match token.kind {
+            TokenKind::Bang => Ok(Self::Not),
+            TokenKind::Minus => Ok(Self::Neg),
+            _ => Err(ParseError::new(
+                token.span,
+                token.span,
+                ParseErrorKind::IncorrectToken {
+                    got: *token,
+                    expected: ExpectedToken::Multiple(Self::ACCEPTED_TOKENS),
+                },
+            )),
+        }
     }
 }
 
@@ -468,6 +552,37 @@ mod tests {
                     )),
                 }),
                 Span::new(0, 18),
+            ),
+        )
+    }
+
+    #[test]
+    fn parse_unary_ops() {
+        assert_parse(
+            "!(0==0)",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::UnaryExpr(Unary {
+                    op: Spanned::new(UnaryOp::Not, Span::new(0, 1)),
+                    expr: Box::new(Spanned::new(
+                        BaseExpr::Parenthesized(Box::new(Expr::BinaryExpr(BinaryExpr {
+                            lhs: Box::new(Spanned::new(
+                                Expr::BaseExpr(BaseExpr::Literal(Literal::IntegerLiteral(
+                                    IntegerLiteral::Value(0),
+                                ))),
+                                Span::new(2, 3),
+                            )),
+                            op: Spanned::new(BinaryOp::Eq, Span::new(3, 5)),
+                            rhs: Box::new(Spanned::new(
+                                Expr::BaseExpr(BaseExpr::Literal(Literal::IntegerLiteral(
+                                    IntegerLiteral::Value(0),
+                                ))),
+                                Span::new(5, 6),
+                            )),
+                        }))),
+                        Span::new(1, 7),
+                    )),
+                })),
+                Span::new(0, 7),
             ),
         )
     }
