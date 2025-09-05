@@ -15,12 +15,13 @@ macro_rules! keywords {
         )*
 
         #[doc = "A list of all keywords"]
-        pub static KEYWORDS: &[&::std::sync::LazyLock<Symbol>] = &[&$($key),*];
+        pub static KEYWORDS: &[&::std::sync::LazyLock<Symbol>] = &[$(&$key),*];
     }
 }
 
 keywords! {
     LET = "let"
+    MUT = "mut"
 }
 
 /// An identifier.
