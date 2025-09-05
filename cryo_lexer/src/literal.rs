@@ -2,11 +2,10 @@
 //!
 //! Literals are tokens which do not require any further computation and are direct, primitive values.
 
-use cryo_span::{Span, Spanned};
+use cryo_span::Span;
 
 use crate::{
-    Lex, LexicalError, LexicalErrorKind, Sealed, Symbol, Token, TokenLike, TokenType, extract,
-    find_token_end,
+    Lex, LexicalError, LexicalErrorKind, Symbol, Token, TokenKind, extract, find_token_end,
 };
 
 /// A literal. View the module-level docs for more information.
@@ -17,8 +16,6 @@ pub enum Literal {
     /// An integer literal.
     IntegerLiteral(IntegerLiteral),
 }
-
-token_marker!(Literal);
 
 impl Lex for Literal {
     fn lex(s: &str) -> Result<(crate::Token, &str), LexicalError> {
@@ -46,18 +43,6 @@ impl Lex for Literal {
 /// String literals are delimited by the token `"`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StringLiteral(pub Symbol);
-
-impl TokenLike for StringLiteral {
-    fn from_token(token: &Token) -> Option<Spanned<Self>> {
-        let lit = Literal::from_token(token)?;
-        match lit.t {
-            Literal::StringLiteral(s) => Some(Spanned::new(s, lit.span)),
-            _ => None,
-        }
-    }
-}
-
-impl Sealed for StringLiteral {}
 
 impl Lex for StringLiteral {
     fn lex(s: &str) -> Result<(crate::Token, &str), crate::LexicalError> {
@@ -107,12 +92,7 @@ impl Lex for StringLiteral {
         }
 
         Ok((
-            Token::new(
-                TokenType::Literal(Literal::StringLiteral(StringLiteral(
-                    unquoted[..cursor].into(),
-                ))),
-                span,
-            ),
+            Token::new(TokenKind::StringLiteral, unquoted[..cursor].into(), span),
             rest,
         ))
     }
@@ -126,18 +106,6 @@ impl Lex for StringLiteral {
 /// A variable number of both negation signs and separators are supported where they are valid.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct IntegerLiteral(pub Symbol);
-
-impl TokenLike for IntegerLiteral {
-    fn from_token(token: &Token) -> Option<Spanned<Self>> {
-        let lit = Literal::from_token(token)?;
-        match lit.t {
-            Literal::IntegerLiteral(s) => Some(Spanned::new(s, lit.span)),
-            _ => None,
-        }
-    }
-}
-
-impl Sealed for IntegerLiteral {}
 
 fn is_invalid_integer_char(c: char) -> bool {
     !matches!(c, '0'..='9' | '_')
@@ -156,9 +124,8 @@ impl Lex for IntegerLiteral {
 
         Ok((
             Token::new(
-                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(
-                    s[..int.len()].into(),
-                ))),
+                TokenKind::IntegerLiteral,
+                s[..int.len()].into(),
                 Span::new(0, int.len() as u32),
             ),
             rest,
@@ -171,8 +138,8 @@ mod tests {
     use cryo_span::Span;
 
     use crate::{
-        Lex, LexicalError, Token, TokenType,
-        literal::{IntegerLiteral, Literal, StringLiteral},
+        Lex, LexicalError, Token, TokenKind,
+        literal::{IntegerLiteral, StringLiteral},
     };
 
     #[test]
@@ -182,10 +149,7 @@ mod tests {
         assert_eq!(
             StringLiteral::lex(input),
             Ok((
-                Token::new(
-                    TokenType::Literal(Literal::StringLiteral(StringLiteral("hello".into()))),
-                    Span::new(0, 7)
-                ),
+                Token::new(TokenKind::StringLiteral, "hello".into(), Span::new(0, 7)),
                 ""
             ))
         )
@@ -198,9 +162,8 @@ mod tests {
             StringLiteral::lex(input),
             Ok((
                 Token::new(
-                    TokenType::Literal(Literal::StringLiteral(StringLiteral(
-                        "hello, world\\n".into()
-                    ))),
+                    TokenKind::StringLiteral,
+                    "hello, world\\n".into(),
                     Span::new(0, 16)
                 ),
                 ""
@@ -227,10 +190,7 @@ mod tests {
         assert_eq!(
             IntegerLiteral::lex(input),
             Ok((
-                Token::new(
-                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input.into()))),
-                    Span::new(0, 6)
-                ),
+                Token::new(TokenKind::IntegerLiteral, input.into(), Span::new(0, 6)),
                 ""
             ))
         )
@@ -242,10 +202,7 @@ mod tests {
         assert_eq!(
             IntegerLiteral::lex(input),
             Ok((
-                Token::new(
-                    TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral(input.into()))),
-                    Span::new(0, 7)
-                ),
+                Token::new(TokenKind::IntegerLiteral, input.into(), Span::new(0, 7)),
                 ""
             ))
         )

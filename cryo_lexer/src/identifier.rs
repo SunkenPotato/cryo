@@ -2,9 +2,9 @@
 //!
 //! View [`Identifier`] for more information.
 
-use cryo_span::{Span, Spanned};
+use cryo_span::Span;
 
-use crate::{Lex, LexicalError, Sealed, Symbol, Token, TokenLike, TokenType, extract};
+use crate::{Lex, LexicalError, Symbol, Token, TokenKind, extract};
 
 /// An identifier.
 ///
@@ -62,39 +62,22 @@ impl Lex for Identifier {
             ));
         }
 
-        Ok((
-            Token::new(TokenType::Identifier(Identifier(token.into())), span),
-            rest,
-        ))
+        Ok((Token::new(TokenKind::Identifier, token.into(), span), rest))
     }
 }
-
-impl TokenLike for Identifier {
-    fn from_token(token: &Token) -> Option<Spanned<Self>> {
-        match token.t {
-            TokenType::Identifier(ref id) => Some(Spanned::new(*id, token.span)),
-            _ => None,
-        }
-    }
-}
-
-impl Sealed for Identifier {}
 
 #[cfg(test)]
 mod tests {
     use cryo_span::Span;
 
-    use crate::{Lex, LexicalError, Token, TokenType, identifier::Identifier};
+    use crate::{Lex, LexicalError, Token, TokenKind, identifier::Identifier};
 
     #[test]
     fn parse_ident() {
         assert_eq!(
             Identifier::lex("twenty_1"),
             Ok((
-                Token::new(
-                    TokenType::Identifier(Identifier("twenty_1".into())),
-                    Span::new(0, 8)
-                ),
+                Token::new(TokenKind::Identifier, "twenty_1".into(), Span::new(0, 8)),
                 ""
             ))
         )

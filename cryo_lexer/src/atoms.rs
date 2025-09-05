@@ -16,12 +16,13 @@ macro_rules! atom {
             fn lex(s: &str) -> Result<($crate::Token, &str), $crate::LexicalError> {
                 let rest = s
                     .strip_prefix($atom)
-                    .ok_or($crate::LexicalError::new($crate::LexicalErrorKind::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len() as u32)))?;
-                Ok(($crate::Token::new($crate::TokenType::$identifier(Self), cryo_span::Span::new(0, $atom.len() as u32)), rest))
+                    .ok_or(
+                        $crate::LexicalError::new(
+                            $crate::LexicalErrorKind::SequenceNotFound($atom), cryo_span::Span::new(0, $atom.len() as u32)
+                        ))?;
+                Ok(($crate::Token::new($crate::TokenKind::$identifier, $atom.into(), cryo_span::Span::new(0, $atom.len() as u32)), rest))
             }
         }
-
-        token_marker!($identifier);
 
         #[cfg(test)]
         ::paste::paste! {
@@ -34,7 +35,8 @@ macro_rules! atom {
                     $identifier::lex($atom),
                     Ok((
                         $crate::Token::new(
-                            $crate::TokenType::$identifier($identifier),
+                            $crate::TokenKind::$identifier,
+                            $atom.into(),
                             cryo_span::Span::new(0, $atom.len() as u32)
                         ),
                         ""

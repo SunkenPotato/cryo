@@ -1,10 +1,7 @@
 //! Spans for the `cryo` language.
 //!
 //! A span declares a range inside a file.
-use std::{
-    ops::{Deref, DerefMut},
-    str::Lines,
-};
+use std::ops::{Deref, DerefMut};
 
 /// A span.
 ///
@@ -153,22 +150,9 @@ impl<T> DerefMut for Spanned<T> {
     }
 }
 
-/// An iterator over the lines of something, with a span.
-pub struct SpannedLines<'a> {
-    inner: Lines<'a>,
-    curr: u32,
-}
-
-impl<'a> Iterator for SpannedLines<'a> {
-    type Item = Spanned<&'a str>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|v| {
-            let new_curr = self.curr + v.len() as u32;
-            let s = Spanned::new(v, Span::new(self.curr, new_curr));
-            self.curr = new_curr;
-            s
-        })
+impl<T> HasSpan for Spanned<T> {
+    fn span(&mut self) -> &mut Span {
+        &mut self.span
     }
 }
 
@@ -180,4 +164,21 @@ pub trait SpanIndexable {
     fn line_col(&self, offset: u32) -> (u32, u32);
     /// The source file that this data type got its contents from.
     fn file(&self) -> &str;
+}
+
+/// Common behaviour for things with spans.
+pub trait HasSpan {
+    /// Retrieve the span this stores.
+    fn span(&mut self) -> &mut Span;
+    /// Offset the inner span by `n`. This should not be overriden.
+    fn offset(&mut self, n: u32)
+    where
+        Self: Sized,
+    {
+        *self.span() = self.span().offset(n);
+    }
+    /// Extend the inner span by `n`. This should not be overriden.
+    fn extend(&mut self, other: Span) {
+        *self.span() = self.span().extend(other);
+    }
 }

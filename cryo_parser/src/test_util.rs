@@ -6,7 +6,7 @@ use cryo_span::Spanned;
 
 use crate::{Parse, ParseError};
 
-#[expect(unused)]
+#[track_caller]
 pub fn assert_parse<T>(input: &str, expected: Spanned<T>)
 where
     T: Parse + Debug + PartialEq,
@@ -19,12 +19,13 @@ where
             assert_eq!(v, expected)
         }
         Err(e) => {
-            panic!("failed to parse {}", ::core::any::type_name::<T>())
+            panic!("failed to parse {}: {e:?}", ::core::any::type_name::<T>())
         }
     }
 }
 
 #[expect(unused)]
+#[track_caller]
 pub fn assert_parse_fail<T>(input: &str, expected: ParseError)
 where
     T: Parse + Debug,

@@ -1,11 +1,17 @@
 //! Parser for the `cryo` language.
+#![feature(sync_unsafe_cell)]
 
 #[cfg(test)]
 mod test_util;
 
-use cryo_diagnostic::{Diagnostic, DiagnosticKind, Diagnostics, SourceFile};
-use cryo_lexer::stream::{Guard, TokenStream};
-use cryo_span::Span;
+pub mod expr;
+
+use cryo_diagnostic::{Diagnostics, SourceFile};
+use cryo_lexer::{
+    Token, TokenKind,
+    stream::{Guard, TokenStream, TokenStreamError},
+};
+use cryo_span::{HasSpan, Span};
 
 /// The result of a parser.
 pub type ParseResult<T> = Result<T, ParseError>;
@@ -22,6 +28,12 @@ pub trait IsFail {
     fn is_fail(&self) -> bool;
 }
 
+impl IsFail for () {
+    fn is_fail(&self) -> bool {
+        false
+    }
+}
+
 /// A very basic, uninformative parse error.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ParseError {
@@ -36,37 +48,63 @@ pub struct ParseError {
 /// Parse error types. Used in conjunction with [`ParseError`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ParseErrorKind {
-    /// A semicolon was missing.
-    MissingSemi,
+    /// An incorrect token was received.
+    IncorrectToken {
+        /// The token which was received.
+        got: Token,
+        /// The expected token kind.
+        expected: ExpectedToken,
+    },
+    /// Unexpected EOF.
+    EndOfInput(Span),
 }
 
-impl ParseErrorKind {
-    /// The error code.
-    pub const fn code(self) -> Option<u16> {
-        match self {
-            Self::MissingSemi => None,
-        }
-    }
-
-    /// The error message.
-    pub const fn message(self) -> &'static str {
-        match self {
-            Self::MissingSemi => "expected `;`",
-        }
-    }
+/// Utility for storing either one expected token kind or multiple in the form of a static slice.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ExpectedToken {
+    /// An owned [`TokenKind`].
+    Owned(TokenKind),
+    /// A static slice of [`TokenKind`]s
+    Multiple(&'static [TokenKind]),
 }
 
 impl ParseError {
-    /// Convert this error into a diagnostic.
-    pub fn into_diagnostic(self) -> Diagnostic {
-        Diagnostic::new(
-            DiagnosticKind::Error(self.kind.code()),
-            self.kind.message().to_owned(),
-            vec![],
-            vec![],
-            self.context,
-            self.span,
-        )
+    /// Create a new [`ParseError`].
+    pub const fn new(span: Span, context: Span, kind: ParseErrorKind) -> Self {
+        Self {
+            span,
+            context,
+            kind,
+        }
+    }
+}
+
+impl From<TokenStreamError> for ParseError {
+    fn from(value: TokenStreamError) -> Self {
+        match value {
+            TokenStreamError::EndOfInput(s) => Self {
+                span: s,
+                context: s,
+                kind: ParseErrorKind::EndOfInput(s),
+            },
+            TokenStreamError::IncorrectToken { got, expected } => Self {
+                span: got.span,
+                context: got.span,
+                kind: ParseErrorKind::IncorrectToken {
+                    got,
+                    expected: ExpectedToken::Owned(expected),
+                },
+            },
+        }
+    }
+}
+
+impl HasSpan for ParseErrorKind {
+    fn span(&mut self) -> &mut Span {
+        match self {
+            Self::IncorrectToken { got, .. } => &mut got.span,
+            Self::EndOfInput(s) => s,
+        }
     }
 }
 
@@ -103,3 +141,5 @@ impl<'d> Parser<'d> {
 
 /// An abstract syntax tree, produced by a parser.
 pub struct AbstractSyntaxTree {}
+
+impl AbstractSyntaxTree {}

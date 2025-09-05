@@ -4,25 +4,6 @@
 
 #![feature(array_try_from_fn)]
 
-macro_rules! token_marker {
-    (
-        $type:ident
-    ) => {
-        impl $crate::Sealed for $type {}
-
-        impl $crate::TokenLike for $type {
-            fn from_token(token: &$crate::Token) -> Option<::cryo_span::Spanned<Self>> {
-                match token.t {
-                    $crate::TokenType::$type(ref v) => {
-                        Some(::cryo_span::Spanned::new(*v, token.span))
-                    }
-                    _ => None,
-                }
-            }
-        }
-    };
-}
-
 pub mod atoms;
 pub mod identifier;
 pub mod literal;
@@ -31,7 +12,7 @@ pub mod stream;
 use std::fmt::Display;
 
 use cryo_diagnostic::SourceFile;
-use cryo_span::{Span, Spanned};
+use cryo_span::{HasSpan, Span, Spanned};
 use internment::Intern;
 
 use crate::{
@@ -44,23 +25,36 @@ use crate::{
     stream::TokenStream,
 };
 
-/// A token. Contains a [`Span`] and a [`TokenType`].
-pub type Token = Spanned<TokenType>;
+/// A token.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct Token {
+    /// The token kind.
+    pub kind: TokenKind,
+    /// The lexeme, or the string associated with it.
+    pub lexeme: Symbol,
+    /// The span.
+    pub span: Span,
+}
 
-/// Extension trait for `Spanned<TokenType>` (a.k.a., [`Token`]).
-pub trait TokenExt {
-    /// Attempt to reinterpret `self` as `T` using [`FromToken`].
-    fn require<T: TokenLike>(&self) -> Option<Spanned<T>>;
-    /// Checks whether `self` can be reinterpreted as `T`.
-    fn is<T: TokenLike>(&self) -> bool {
-        self.require::<T>().is_some()
+impl Token {
+    /// Create a new token.
+    pub const fn new(kind: TokenKind, lexeme: Symbol, span: Span) -> Self {
+        Self { kind, lexeme, span }
+    }
+
+    /// Require this to be of the given [`TokenKind`].
+    pub fn require(&self, kind: TokenKind) -> Option<Symbol> {
+        if kind == self.kind {
+            return Some(self.lexeme);
+        }
+
+        None
     }
 }
 
-impl TokenExt for Token {
-    #[track_caller]
-    fn require<T: TokenLike>(&self) -> Option<Spanned<T>> {
-        T::from_token(self)
+impl HasSpan for Token {
+    fn span(&mut self) -> &mut Span {
+        &mut self.span
     }
 }
 
@@ -104,59 +98,28 @@ trait Lex: Sized {
     fn lex(s: &str) -> Result<(Token, &str), LexicalError>;
 }
 
-/// The possible types a token may be. `'source` refers to the lifetime of the input given to the parser.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TokenType {
-    /// An identifier.
-    Identifier(Identifier),
-
-    /// A literal.
-    Literal(Literal),
-
-    /// A semicolon (`;`).
-    Semi(Semi),
-
-    /// A plus (`+`).
-    Plus(Plus),
-
-    /// A minus (`-`).
-    Minus(Minus),
-
-    /// A star (`*`).
-    Star(Star),
-
-    /// A slash (`/`).
-    Slash(Slash),
-
-    /// A percent sign (`%`).
-    Percent(Percent),
-
-    /// An equals sign (`=`).
-    Equal(Equal),
-
-    /// A bang (`!`).
-    Bang(Bang),
-
-    /// The right curly brace ('{').
-    RCurly(RCurly),
-
-    /// The left curly brace ('}')
-    LCurly(LCurly),
-
-    /// The left parenthesis (`(`).
-    LParen(LParen),
-
-    /// The right parenthesis (`)`).
-    RParen(RParen),
-
-    /// A comma.
-    Comma(Comma),
-
-    /// A colon.
-    Colon(Colon),
-
-    /// A dot.
-    Dot(Dot),
+/// A token kind.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[expect(missing_docs)]
+pub enum TokenKind {
+    Identifier,
+    IntegerLiteral,
+    StringLiteral,
+    Semi,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Equal,
+    Bang,
+    RCurly,
+    LCurly,
+    RParen,
+    LParen,
+    Comma,
+    Colon,
+    Dot,
 }
 
 trait Sealed {}
@@ -168,7 +131,7 @@ pub trait TokenLike: Sealed + Sized {
     fn from_token(token: &Token) -> Option<Spanned<Self>>;
 }
 
-impl TokenType {
+impl TokenKind {
     // the order of these is important
     const LEX_FUNCTIONS: &[LexFn] = &[
         Identifier::lex,
@@ -191,7 +154,7 @@ impl TokenType {
     ];
 }
 
-impl Lex for TokenType {
+impl Lex for TokenKind {
     fn lex(s: &str) -> Result<(Token, &str), LexicalError> {
         for f in Self::LEX_FUNCTIONS {
             if let Ok(v) = f(s) {
@@ -283,14 +246,14 @@ fn lexer(input: &str) -> Result<TokenStream, LexicalError> {
     let mut cursor = input.len() - loop_input.len();
 
     while !loop_input.is_empty() {
-        let (mut token, rest) = TokenType::lex(loop_input)?;
+        let (mut token, rest) = TokenKind::lex(loop_input)?;
 
         if loop_input.len() == rest.len() {
             return Err(LexicalError::zero(LexicalErrorKind::NoProgress));
         }
 
         let token_len = loop_input.len() - rest.len();
-        token = token.offset(cursor as u32);
+        token.offset(cursor as u32);
 
         tokens.push(token);
         cursor += token_len;
@@ -315,38 +278,20 @@ impl TryInto<TokenStream> for &str {
 mod tests {
     use cryo_span::Span;
 
-    use crate::{
-        Token, TokenType,
-        atoms::{Equal, Semi},
-        identifier::Identifier,
-        lexer,
-        literal::{IntegerLiteral, Literal, StringLiteral},
-    };
+    use crate::{Token, TokenKind, lexer};
 
     #[test]
     fn lex() {
         let input = "let input = 20 + \"hello\";";
 
         let expected = [
-            Token::new(
-                TokenType::Identifier(Identifier("let".into())),
-                Span::new(0, 3),
-            ),
-            Token::new(
-                TokenType::Identifier(Identifier("input".into())),
-                Span::new(4, 9),
-            ),
-            Token::new(TokenType::Equal(Equal), Span::new(10, 11)),
-            Token::new(
-                TokenType::Literal(Literal::IntegerLiteral(IntegerLiteral("20".into()))),
-                Span::new(12, 14),
-            ),
-            Token::new(TokenType::Plus(crate::atoms::Plus), Span::new(15, 16)),
-            Token::new(
-                TokenType::Literal(Literal::StringLiteral(StringLiteral("hello".into()))),
-                Span::new(17, 24),
-            ),
-            Token::new(TokenType::Semi(Semi), Span::new(24, 25)),
+            Token::new(TokenKind::Identifier, "let".into(), Span::new(0, 3)),
+            Token::new(TokenKind::Identifier, "input".into(), Span::new(4, 9)),
+            Token::new(TokenKind::Equal, "=".into(), Span::new(10, 11)),
+            Token::new(TokenKind::IntegerLiteral, "20".into(), Span::new(12, 14)),
+            Token::new(TokenKind::Plus, "+".into(), Span::new(15, 16)),
+            Token::new(TokenKind::StringLiteral, "hello".into(), Span::new(17, 24)),
+            Token::new(TokenKind::Semi, ";".into(), Span::new(24, 25)),
         ];
 
         assert_eq!(&*lexer(input).unwrap().inner, expected)
