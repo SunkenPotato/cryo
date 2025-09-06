@@ -8,6 +8,7 @@ use crate::{
     IsFail, Parse, ParseError, ParseErrorKind,
     expr::Expr,
     ident::{Ident, LET, MUT},
+    item::Item,
 };
 
 /// A statement.
@@ -18,6 +19,8 @@ pub enum Stmt {
     BindingDef(BindingDef),
     /// An expression terminated by a semicolon, such as `print("Hello");`.
     ExprSemi(Expr),
+    /// An inline item.
+    Item(Item),
 }
 
 /// A mutability marker.
@@ -90,6 +93,7 @@ impl Parse for Stmt {
         tokens
             .with(BindingDef::parse)
             .map(Self::BindingDef)
+            .or_else(|_| tokens.with(Item::parse).map(Self::Item))
             .or_else(|_| tokens.with(parse_expr_semi).map(Self::ExprSemi))
     }
 }
