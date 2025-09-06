@@ -28,7 +28,7 @@ keywords! {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, IsFail)]
 #[fail = false]
 #[repr(transparent)]
-pub struct Ident(Symbol);
+pub struct Ident(pub Symbol);
 
 impl Ident {
     /// Check if this identifier is a keyword.

@@ -6,6 +6,7 @@ mod test_util;
 
 pub mod expr;
 pub mod ident;
+pub mod stmt;
 
 use cryo_diagnostic::{Diagnostics, SourceFile};
 use cryo_lexer::{
@@ -13,6 +14,7 @@ use cryo_lexer::{
     stream::{Guard, TokenStream, TokenStreamError},
 };
 use cryo_span::Span;
+use internment::Intern;
 
 /// The result of a parser.
 pub type ParseResult<T> = Result<T, ParseError>;
@@ -60,6 +62,8 @@ pub enum ParseErrorKind {
     EndOfInput(Span),
     /// An unclosed delimiter was parsed.
     UnclosedDelimiter(TokenKind),
+    /// The parser expected a keyword.
+    ExpectedKeyword(Intern<str>),
 }
 
 /// Utility for storing either one expected token kind or multiple in the form of a static slice.
