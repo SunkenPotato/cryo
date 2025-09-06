@@ -22,6 +22,7 @@ macro_rules! keywords {
 keywords! {
     LET = "let"
     MUT = "mut"
+    RECORD = "record"
 }
 
 /// An identifier.

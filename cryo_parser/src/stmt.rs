@@ -59,7 +59,7 @@ impl Parse for BindingDef {
             return Err(ParseError {
                 span: let_kw.span,
                 context: let_kw.span,
-                kind: ParseErrorKind::ExpectedKeyword(*LET),
+                kind: ParseErrorKind::ExpectedKeyword(crate::OneOrMany::Owned(&LET)),
             });
         }
 

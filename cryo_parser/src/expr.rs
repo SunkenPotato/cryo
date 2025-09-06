@@ -5,7 +5,7 @@ use cryo_parser_proc_macro::IsFail;
 use cryo_span::Spanned;
 
 use crate::{
-    ExpectedToken, IsFail, Parse, ParseError, ParseErrorKind, expr::literal::Literal, ident::Ident,
+    IsFail, OneOrMany, Parse, ParseError, ParseErrorKind, expr::literal::Literal, ident::Ident,
 };
 
 /// An operator for a binary operator.
@@ -142,7 +142,7 @@ impl Parse for BinaryOp {
                     token.span,
                     ParseErrorKind::IncorrectToken {
                         got: *token,
-                        expected: ExpectedToken::Multiple(Self::ACCEPTED_TOKENS),
+                        expected: OneOrMany::Multiple(Self::ACCEPTED_TOKENS),
                     },
                 ));
             }
@@ -258,7 +258,7 @@ impl Parse for UnaryOp {
                 token.span,
                 ParseErrorKind::IncorrectToken {
                     got: *token,
-                    expected: ExpectedToken::Multiple(Self::ACCEPTED_TOKENS),
+                    expected: OneOrMany::Multiple(Self::ACCEPTED_TOKENS),
                 },
             )),
         }
