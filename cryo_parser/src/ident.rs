@@ -23,6 +23,7 @@ keywords! {
     LET = "let"
     MUT = "mut"
     RECORD = "record"
+    ENUM = "enum"
 }
 
 /// An identifier.

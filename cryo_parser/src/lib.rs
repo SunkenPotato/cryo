@@ -166,9 +166,9 @@ impl<T: Parse> Parse for CommaSeparated<T> {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TypedIdent {
     /// The identifier.
-    pub ident: Ident,
+    pub ident: Spanned<Ident>,
     /// The type.
-    pub ty: Path,
+    pub ty: Spanned<Path>,
 }
 
 impl IsFail for TypedIdent {
@@ -179,9 +179,9 @@ impl IsFail for TypedIdent {
 
 impl Parse for TypedIdent {
     fn parse(tokens: &mut Guard) -> ParseResult<Self> {
-        let ident = tokens.with(Ident::parse)?;
+        let ident = tokens.spanning(Ident::parse)?;
         tokens.advance_require(TokenKind::Colon)?;
-        let ty = tokens.with(Path::parse)?;
+        let ty = tokens.spanning(Path::parse)?;
         Ok(Self { ident, ty })
     }
 }
