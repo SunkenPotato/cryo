@@ -24,6 +24,8 @@ keywords! {
     MUT = "mut"
     RECORD = "record"
     ENUM = "enum"
+    IF = "if"
+    ELSE = "else"
 }
 
 /// An identifier.

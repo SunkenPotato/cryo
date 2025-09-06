@@ -5,7 +5,9 @@ use cryo_parser_proc_macro::IsFail;
 use cryo_span::Spanned;
 
 use crate::{
-    IsFail, OneOrMany, Parse, ParseError, ParseErrorKind, expr::literal::Literal, ident::Ident,
+    IsFail, OneOrMany, Parse, ParseError, ParseErrorKind,
+    expr::literal::Literal,
+    ident::{ELSE, IF, Ident},
     stmt::Stmt,
 };
 
@@ -80,6 +82,8 @@ pub enum BaseExpr {
     Parenthesized(Box<Expr>),
     /// A block expression.
     Block(BlockExpr),
+    /// A conditional expression.
+    CondExpr(CondExpr),
 }
 
 /// An expression.
@@ -125,6 +129,32 @@ pub struct BlockExpr {
     pub stmts: Vec<Spanned<Stmt>>,
     /// The optional, trailing tail expression.
     pub tail: Option<Box<Spanned<Expr>>>,
+}
+
+/// A conditional expression, also known as `if`-expressions.
+#[derive(Clone, PartialEq, Eq, Debug, IsFail)]
+#[fail = false]
+pub struct CondExpr {
+    /// The initial `if`-block.
+    pub if_block: Spanned<IfBlock>,
+    /// `else if`-blocks.
+    pub else_if_blocks: Vec<Spanned<IfBlock>>,
+    /// A final, optional `else`-block.
+    pub else_block: Option<Spanned<BlockExpr>>,
+}
+
+impl CondExpr {
+    const TOKENS_AFTER_ELSE: &[TokenKind] = &[TokenKind::Identifier, TokenKind::LCurly];
+}
+
+/// An `if`-block. This may also be used an `else if` block, since they are semantically the same.
+#[derive(Clone, PartialEq, Eq, Debug, IsFail)]
+#[fail = false]
+pub struct IfBlock {
+    /// The condition.
+    pub cond: Box<Spanned<Expr>>,
+    /// The code to be executed.
+    pub block: Spanned<BlockExpr>,
 }
 
 ////////////////////////////////////
@@ -195,6 +225,7 @@ impl BaseExpr {
         tokens
             .with(Literal::parse)
             .map(Self::Literal)
+            .or_else(|_| tokens.with(CondExpr::parse).map(Self::CondExpr))
             .or_else(|_| tokens.with(BlockExpr::parse).map(Self::Block))
             .or_else(|_| tokens.with(Ident::parse).map(Self::Binding))
     }
@@ -295,6 +326,69 @@ impl Parse for BlockExpr {
         tokens.advance_require(TokenKind::RCurly)?;
 
         Ok(Self { stmts, tail })
+    }
+}
+
+impl Parse for IfBlock {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        let if_kw = tokens.spanning(Ident::parse)?;
+
+        if if_kw.0 != *IF {
+            return Err(ParseError {
+                span: if_kw.span,
+                context: if_kw.span,
+                kind: ParseErrorKind::ExpectedKeyword(OneOrMany::Owned(&IF)),
+            });
+        }
+
+        let cond = Box::new(tokens.spanning(Expr::parse)?);
+        let block = tokens.spanning(BlockExpr::parse)?;
+
+        Ok(Self { cond, block })
+    }
+}
+
+impl Parse for CondExpr {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        let if_block = tokens.spanning(IfBlock::parse)?;
+        let mut else_if_blocks = Vec::new();
+        let mut else_block = None;
+
+        loop {
+            let Ok(else_kw) = tokens.spanning(Ident::parse) else {
+                break;
+            };
+
+            if else_kw.0 != *ELSE {
+                break;
+            }
+
+            let next_token = tokens.peek()?;
+
+            match next_token.kind {
+                TokenKind::LCurly => {
+                    else_block.replace(tokens.spanning(BlockExpr::parse)?);
+                    break;
+                }
+                TokenKind::Identifier => else_if_blocks.push(tokens.spanning(IfBlock::parse)?),
+                _ => {
+                    return Err(ParseError {
+                        span: next_token.span,
+                        context: next_token.span,
+                        kind: ParseErrorKind::IncorrectToken {
+                            got: *next_token,
+                            expected: OneOrMany::Multiple(Self::TOKENS_AFTER_ELSE),
+                        },
+                    });
+                }
+            }
+        }
+
+        Ok(Self {
+            if_block,
+            else_if_blocks,
+            else_block,
+        })
     }
 }
 
@@ -677,6 +771,57 @@ mod tests {
                     ))),
                 })),
                 Span::new(0, 16),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_cond_expr() {
+        assert_parse(
+            "if true {} else if false {} else {}",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::CondExpr(CondExpr {
+                    if_block: Spanned::new(
+                        IfBlock {
+                            cond: Box::new(Spanned::new(
+                                Expr::BaseExpr(BaseExpr::Binding(Ident(Symbol::from("true")))),
+                                Span::new(3, 7),
+                            )),
+                            block: Spanned::new(
+                                BlockExpr {
+                                    stmts: vec![],
+                                    tail: None,
+                                },
+                                Span::new(8, 10),
+                            ),
+                        },
+                        Span::new(0, 10),
+                    ),
+                    else_if_blocks: vec![Spanned::new(
+                        IfBlock {
+                            cond: Box::new(Spanned::new(
+                                Expr::BaseExpr(BaseExpr::Binding(Ident(Symbol::from("false")))),
+                                Span::new(19, 24),
+                            )),
+                            block: Spanned::new(
+                                BlockExpr {
+                                    stmts: vec![],
+                                    tail: None,
+                                },
+                                Span::new(25, 27),
+                            ),
+                        },
+                        Span::new(16, 27),
+                    )],
+                    else_block: Some(Spanned::new(
+                        BlockExpr {
+                            stmts: vec![],
+                            tail: None,
+                        },
+                        Span::new(33, 35),
+                    )),
+                })),
+                Span::new(0, 35),
             ),
         );
     }
