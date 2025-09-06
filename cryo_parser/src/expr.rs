@@ -6,6 +6,7 @@ use cryo_span::Spanned;
 
 use crate::{
     IsFail, OneOrMany, Parse, ParseError, ParseErrorKind, expr::literal::Literal, ident::Ident,
+    stmt::Stmt,
 };
 
 /// An operator for a binary operator.
@@ -77,6 +78,8 @@ pub enum BaseExpr {
     UnaryExpr(Unary),
     /// A parenthesized expression.
     Parenthesized(Box<Expr>),
+    /// A block expression.
+    Block(BlockExpr),
 }
 
 /// An expression.
@@ -112,6 +115,16 @@ impl IsFail for Unary {
     fn is_fail(&self) -> bool {
         self.op.is_fail() && self.expr.is_fail()
     }
+}
+
+/// A block expression.
+#[derive(Clone, PartialEq, Eq, Debug, IsFail)]
+#[fail = false]
+pub struct BlockExpr {
+    /// The statements.
+    pub stmts: Vec<Spanned<Stmt>>,
+    /// The optional, trailing tail expression.
+    pub tail: Option<Box<Spanned<Expr>>>,
 }
 
 ////////////////////////////////////
@@ -182,6 +195,7 @@ impl BaseExpr {
         tokens
             .with(Literal::parse)
             .map(Self::Literal)
+            .or_else(|_| tokens.with(BlockExpr::parse).map(Self::Block))
             .or_else(|_| tokens.with(Ident::parse).map(Self::Binding))
     }
 }
@@ -262,6 +276,25 @@ impl Parse for UnaryOp {
                 },
             )),
         }
+    }
+}
+
+impl Parse for BlockExpr {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        tokens.advance_require(TokenKind::LCurly)?;
+        let mut stmts = Vec::new();
+        let mut tail = None;
+
+        while let Ok(stmt) = tokens.spanning(Stmt::parse) {
+            stmts.push(stmt);
+        }
+
+        if let Ok(expr) = tokens.spanning(Expr::parse) {
+            tail.replace(Box::new(expr));
+        }
+        tokens.advance_require(TokenKind::RCurly)?;
+
+        Ok(Self { stmts, tail })
     }
 }
 
@@ -453,9 +486,10 @@ pub mod literal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cryo_lexer::Symbol;
     use cryo_span::{Span, Spanned};
 
-    use crate::{expr::literal::IntegerLiteral, test_util::assert_parse};
+    use crate::{expr::literal::IntegerLiteral, stmt::BindingDef, test_util::assert_parse};
 
     #[test]
     fn parse_bin_expr() {
@@ -614,6 +648,35 @@ mod tests {
                     )),
                 }),
                 Span::new(0, 6),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_block_expr() {
+        assert_parse(
+            "{ let x = 5; x }",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::Block(BlockExpr {
+                    stmts: vec![Spanned::new(
+                        Stmt::BindingDef(BindingDef {
+                            ident: Spanned::new(Ident(Symbol::from("x")), Span::new(6, 7)),
+                            mutable: None,
+                            value: Spanned::new(
+                                Expr::BaseExpr(BaseExpr::Literal(Literal::IntegerLiteral(
+                                    IntegerLiteral::Value(5),
+                                ))),
+                                Span::new(10, 12),
+                            ),
+                        }),
+                        Span::new(2, 12),
+                    )],
+                    tail: Some(Box::new(Spanned::new(
+                        Expr::BaseExpr(BaseExpr::Binding(Ident(Symbol::from("x")))),
+                        Span::new(13, 14),
+                    ))),
+                })),
+                Span::new(0, 16),
             ),
         );
     }
