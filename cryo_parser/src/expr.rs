@@ -586,4 +586,35 @@ mod tests {
             ),
         )
     }
+
+    #[test]
+    fn parse_binary_with_unary() {
+        assert_parse(
+            "5 - -5",
+            Spanned::new(
+                Expr::BinaryExpr(BinaryExpr {
+                    lhs: Box::new(Spanned::new(
+                        Expr::BaseExpr(BaseExpr::Literal(Literal::IntegerLiteral(
+                            IntegerLiteral::Value(5),
+                        ))),
+                        Span::new(0, 1),
+                    )),
+                    op: Spanned::new(BinaryOp::Sub, Span::new(2, 3)),
+                    rhs: Box::new(Spanned::new(
+                        Expr::BaseExpr(BaseExpr::UnaryExpr(Unary {
+                            op: Spanned::new(UnaryOp::Neg, Span::new(4, 5)),
+                            expr: Box::new(Spanned::new(
+                                BaseExpr::Literal(Literal::IntegerLiteral(IntegerLiteral::Value(
+                                    5,
+                                ))),
+                                Span::new(5, 6),
+                            )),
+                        })),
+                        Span::new(4, 6),
+                    )),
+                }),
+                Span::new(0, 6),
+            ),
+        );
+    }
 }
