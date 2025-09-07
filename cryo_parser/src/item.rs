@@ -27,7 +27,7 @@ pub enum Item {
 }
 
 impl Item {
-    const ACCEPTED_KEYWORDS: &[&LazyLock<Intern<str>>] = &[&RECORD, &ENUM, &FUNC];
+    const ACCEPTED_KEYWORDS: &[&LazyLock<Intern<str>>] = &[&RECORD, &ENUM, &FUNC, &STATIC];
 }
 
 /// A record definition.

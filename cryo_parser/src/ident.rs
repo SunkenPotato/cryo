@@ -29,6 +29,7 @@ keywords! {
     FUNC = "func"
     CONST = "const"
     STATIC = "static"
+    IMPORT = "import"
 }
 
 /// An identifier.
