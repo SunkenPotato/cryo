@@ -5,9 +5,7 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use syn::{Data, DeriveInput, Ident, parse_macro_input, spanned::Spanned};
 
-/// Derive the `IsFail` trait for this struct or enum.
-///
-/// If this is an enum, the variant marked with `#[fail]` will be used when checking
+#[expect(missing_docs)]
 #[proc_macro_derive(IsFail, attributes(fail))]
 pub fn derive_is_fail(tokens: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(tokens as DeriveInput);
