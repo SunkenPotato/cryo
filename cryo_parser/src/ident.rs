@@ -26,6 +26,8 @@ keywords! {
     ENUM = "enum"
     IF = "if"
     ELSE = "else"
+    FUNC = "func"
+    CONST = "const"
 }
 
 /// An identifier.

@@ -4,7 +4,8 @@ use std::sync::LazyLock;
 
 use crate::{
     CommaSeparated, IsFail, OneOrMany, Parse, ParseError, ParseErrorKind, Path, TypedIdent,
-    ident::{ENUM, Ident, RECORD},
+    expr::BlockExpr,
+    ident::{CONST, ENUM, FUNC, Ident, RECORD},
 };
 use cryo_lexer::{TokenKind, stream::StreamLike};
 use cryo_parser_proc_macro::IsFail;
@@ -19,10 +20,12 @@ pub enum Item {
     Record(RecordDef),
     /// An enum definition.
     Enum(EnumDef),
+    /// A function definition.
+    FuncDef(FuncDef),
 }
 
 impl Item {
-    const ACCEPTED_KEYWORDS: &[&LazyLock<Intern<str>>] = &[&RECORD];
+    const ACCEPTED_KEYWORDS: &[&LazyLock<Intern<str>>] = &[&RECORD, &ENUM, &FUNC];
 }
 
 /// A record definition.
@@ -63,6 +66,27 @@ impl IsFail for EnumVariant {
     fn is_fail(&self) -> bool {
         self.ident.is_fail() && self.ty.as_ref().map(|v| v.is_fail()).unwrap_or(true)
     }
+}
+
+/// Whether or not a function is callable from const contexts.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Const;
+
+// fn #name(#(#args),*) #(is_const)? #(-> #ret_ty)? #body
+/// A function definition.
+#[derive(Clone, PartialEq, Eq, Debug, IsFail)]
+#[fail = false]
+pub struct FuncDef {
+    /// The identifier.
+    pub ident: Spanned<Ident>,
+    /// The arguments to this function.
+    pub args: Spanned<CommaSeparated<TypedIdent>>,
+    /// Whether this function can be called from a const context or not.
+    pub is_const: Option<Spanned<Const>>,
+    /// The return type.
+    pub ret_ty: Option<Spanned<Path>>,
+    /// The body.
+    pub body: Spanned<BlockExpr>,
 }
 
 ////////////////////////////////////
@@ -126,6 +150,52 @@ impl Parse for EnumDef {
     }
 }
 
+impl Parse for FuncDef {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        let func_kw = tokens.advance_require(TokenKind::Identifier)?;
+        if *func_kw != *FUNC {
+            return Err(ParseError {
+                span: func_kw.span,
+                context: func_kw.span,
+                kind: ParseErrorKind::ExpectedKeyword(OneOrMany::Owned(&FUNC)),
+            });
+        }
+
+        let ident = tokens.spanning(Ident::parse)?;
+        tokens.advance_require(TokenKind::LParen)?;
+        let args = tokens.spanning(CommaSeparated::parse)?;
+        tokens.advance_require(TokenKind::RParen)?;
+        let mut is_const = None;
+
+        if let Ok(token) = tokens.spanning(Ident::parse) {
+            if token.t.0 != *CONST {
+                return Err(ParseError {
+                    span: token.span,
+                    context: token.span,
+                    kind: ParseErrorKind::ExpectedKeyword(OneOrMany::Owned(&CONST)),
+                });
+            }
+
+            is_const.replace(token.map(|_| Const));
+        }
+
+        let mut ret_ty = None;
+
+        if tokens.advance_require(TokenKind::Colon).is_ok() {
+            ret_ty.replace(tokens.spanning(Path::parse)?);
+        }
+
+        let body = tokens.spanning(BlockExpr::parse)?;
+
+        Ok(Self {
+            ident,
+            args,
+            is_const,
+            ret_ty,
+            body,
+        })
+    }
+}
 impl Parse for Item {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
         let next = tokens.peek_require(TokenKind::Identifier)?;
@@ -134,6 +204,8 @@ impl Parse for Item {
             tokens.with(RecordDef::parse).map(Self::Record)
         } else if next.t == *ENUM {
             tokens.with(EnumDef::parse).map(Self::Enum)
+        } else if next.t == *FUNC {
+            tokens.with(FuncDef::parse).map(Self::FuncDef)
         } else {
             Err(ParseError {
                 span: next.span,
@@ -155,8 +227,9 @@ mod tests {
 
     use crate::{
         CommaSeparated, TypedIdent,
+        expr::{BaseExpr, BinaryExpr, BinaryOp, BlockExpr, Expr},
         ident::Ident,
-        item::{EnumDef, EnumVariant, Item, RecordDef},
+        item::{Const, EnumDef, EnumVariant, FuncDef, Item, RecordDef},
         test_util::assert_parse,
     };
 
@@ -250,6 +323,82 @@ mod tests {
                     ),
                 }),
                 Span::new(0, 25),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_fn_def() {
+        assert_parse(
+            "func add(lhs: int, rhs: int) const: int { lhs + rhs }",
+            Spanned::new(
+                Item::FuncDef(FuncDef {
+                    ident: Spanned::new(Ident(Symbol::from("add")), Span::new(5, 8)),
+                    args: Spanned::new(
+                        CommaSeparated {
+                            inner: vec![(
+                                Spanned::new(
+                                    TypedIdent {
+                                        ident: Spanned::new(
+                                            Ident(Symbol::from("lhs")),
+                                            Span::new(9, 12),
+                                        ),
+                                        ty: Spanned::new(
+                                            Spanned::new("int", Span::new(14, 17)).into(),
+                                            Span::new(14, 17),
+                                        ),
+                                    },
+                                    Span::new(9, 17),
+                                ),
+                                Spanned::new(Comma, Span::new(17, 18)),
+                            )],
+                            last: Some(Box::new(Spanned::new(
+                                TypedIdent {
+                                    ident: Spanned::new(
+                                        Ident(Symbol::from("rhs")),
+                                        Span::new(19, 22),
+                                    ),
+                                    ty: Spanned::new(
+                                        Spanned::new("int", Span::new(24, 27)).into(),
+                                        Span::new(24, 27),
+                                    ),
+                                },
+                                Span::new(19, 27),
+                            ))),
+                        },
+                        Span::new(9, 27),
+                    ),
+                    is_const: Some(Spanned::new(Const, Span::new(29, 34))),
+                    ret_ty: Some(Spanned::new(
+                        Spanned::new("int", Span::new(36, 39)).into(),
+                        Span::new(36, 39),
+                    )),
+                    body: Spanned::new(
+                        BlockExpr {
+                            stmts: vec![],
+                            tail: Some(Box::new(Spanned::new(
+                                Expr::BinaryExpr(BinaryExpr {
+                                    lhs: Box::new(Spanned::new(
+                                        Expr::BaseExpr(BaseExpr::Path(
+                                            Spanned::new("lhs", Span::new(42, 45)).into(),
+                                        )),
+                                        Span::new(42, 45),
+                                    )),
+                                    op: Spanned::new(BinaryOp::Add, Span::new(46, 47)),
+                                    rhs: Box::new(Spanned::new(
+                                        Expr::BaseExpr(BaseExpr::Path(
+                                            Spanned::new("rhs", Span::new(48, 51)).into(),
+                                        )),
+                                        Span::new(48, 51),
+                                    )),
+                                }),
+                                Span::new(42, 51),
+                            ))),
+                        },
+                        Span::new(40, 53),
+                    ),
+                }),
+                Span::new(0, 53),
             ),
         );
     }

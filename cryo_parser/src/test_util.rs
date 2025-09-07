@@ -16,7 +16,7 @@ where
 
     match stream.spanning(T::parse) {
         Ok(v) => {
-            assert_eq!(v, expected)
+            pretty_assertions::assert_eq!(expected, v)
         }
         Err(e) => {
             panic!("failed to parse {}: {e:?}", ::core::any::type_name::<T>())
@@ -35,6 +35,6 @@ where
 
     match stream.spanning(T::parse) {
         Ok(v) => panic!("parse succeeded: {v:?}"),
-        Err(e) => assert_eq!(e, expected),
+        Err(e) => pretty_assertions::assert_eq!(e, expected),
     }
 }
