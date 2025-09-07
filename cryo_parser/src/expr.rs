@@ -5,7 +5,7 @@ use cryo_parser_proc_macro::IsFail;
 use cryo_span::Spanned;
 
 use crate::{
-    CommaSeparated, IsFail, OneOrMany, Parse, ParseError, ParseErrorKind,
+    CommaSeparated, IsFail, OneOrMany, Parse, ParseError, ParseErrorKind, Path,
     expr::literal::Literal,
     ident::{ELSE, IF, Ident},
     stmt::Stmt,
@@ -74,8 +74,8 @@ pub struct BinaryExpr {
 pub enum BaseExpr {
     /// A literal expression.
     Literal(Literal),
-    /// A binding usage.
-    Binding(Ident),
+    /// A path. This could also be a binding.
+    Path(Path),
     /// A unary expression.
     UnaryExpr(Unary),
     /// A parenthesized expression.
@@ -252,7 +252,7 @@ impl BaseExpr {
                 .map(Self::Literal)
                 .or_else(|_| tokens.with(CondExpr::parse).map(Self::CondExpr))
                 .or_else(|_| tokens.with(BlockExpr::parse).map(Self::Block))
-                .or_else(|_| tokens.with(Ident::parse).map(Self::Binding))
+                .or_else(|_| tokens.with(Path::parse).map(Self::Path))
         });
 
         tokens.with(|tokens| Self::parse_2(tokens, expr?))
@@ -847,7 +847,7 @@ mod tests {
                         Span::new(2, 12),
                     )],
                     tail: Some(Box::new(Spanned::new(
-                        Expr::BaseExpr(BaseExpr::Binding(Ident(Symbol::from("x")))),
+                        Expr::BaseExpr(BaseExpr::Path(Spanned::new("x", Span::new(13, 14)).into())),
                         Span::new(13, 14),
                     ))),
                 })),
@@ -865,7 +865,9 @@ mod tests {
                     if_block: Spanned::new(
                         IfBlock {
                             cond: Box::new(Spanned::new(
-                                Expr::BaseExpr(BaseExpr::Binding(Ident(Symbol::from("true")))),
+                                Expr::BaseExpr(BaseExpr::Path(
+                                    Spanned::new("true", Span::new(3, 7)).into(),
+                                )),
                                 Span::new(3, 7),
                             )),
                             block: Spanned::new(
@@ -881,7 +883,9 @@ mod tests {
                     else_if_blocks: vec![Spanned::new(
                         IfBlock {
                             cond: Box::new(Spanned::new(
-                                Expr::BaseExpr(BaseExpr::Binding(Ident(Symbol::from("false")))),
+                                Expr::BaseExpr(BaseExpr::Path(
+                                    Spanned::new("false", Span::new(19, 24)).into(),
+                                )),
                                 Span::new(19, 24),
                             )),
                             block: Spanned::new(
@@ -914,7 +918,7 @@ mod tests {
             Spanned::new(
                 Expr::BaseExpr(BaseExpr::FnCall(FnCall {
                     target: Box::new(Spanned::new(
-                        BaseExpr::Binding(Ident(Symbol::from("print"))),
+                        BaseExpr::Path(Spanned::new("print", Span::new(0, 5)).into()),
                         Span::new(0, 5),
                     )),
                     args: Spanned::new(
@@ -944,7 +948,7 @@ mod tests {
                     target: Box::new(Spanned::new(
                         BaseExpr::FieldAccess(FieldAccess {
                             target: Box::new(Spanned::new(
-                                BaseExpr::Binding(Ident(Symbol::from("box"))),
+                                BaseExpr::Path(Spanned::new("box", Span::new(0, 3)).into()),
                                 Span::new(0, 3),
                             )),
                             field: Spanned::new(Ident(Symbol::from("leak")), Span::new(4, 8)),

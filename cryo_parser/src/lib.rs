@@ -200,8 +200,16 @@ impl Parse for Path {
     fn parse(tokens: &mut Guard) -> ParseResult<Self> {
         let mut buf = Vec::new();
 
-        while let Ok(t) = tokens.spanning(Ident::parse) {
-            buf.push(t);
+        loop {
+            let ident = tokens.spanning(Ident::parse);
+
+            match (ident, buf.is_empty()) {
+                (Err(e), true) => return Err(e),
+                (Err(_), false) => break,
+                _ => (),
+            }
+
+            buf.push(ident.unwrap());
             if tokens
                 .with(|tokens| {
                     tokens
