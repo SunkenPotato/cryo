@@ -28,6 +28,7 @@ keywords! {
     ELSE = "else"
     FUNC = "func"
     CONST = "const"
+    STATIC = "static"
 }
 
 /// An identifier.

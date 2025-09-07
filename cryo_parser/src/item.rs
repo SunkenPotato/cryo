@@ -4,8 +4,8 @@ use std::sync::LazyLock;
 
 use crate::{
     CommaSeparated, IsFail, OneOrMany, Parse, ParseError, ParseErrorKind, Path, TypedIdent,
-    expr::BlockExpr,
-    ident::{CONST, ENUM, FUNC, Ident, RECORD},
+    expr::{BlockExpr, Expr},
+    ident::{CONST, ENUM, FUNC, Ident, RECORD, STATIC},
 };
 use cryo_lexer::{TokenKind, stream::StreamLike};
 use cryo_parser_proc_macro::IsFail;
@@ -22,6 +22,8 @@ pub enum Item {
     Enum(EnumDef),
     /// A function definition.
     FuncDef(FuncDef),
+    /// A static definition.
+    StaticDef(StaticDef),
 }
 
 impl Item {
@@ -87,6 +89,17 @@ pub struct FuncDef {
     pub ret_ty: Option<Spanned<Path>>,
     /// The body.
     pub body: Spanned<BlockExpr>,
+}
+
+// static #ident: #ty = #value;
+/// A static variable definition.
+#[derive(Clone, PartialEq, Eq, Debug, IsFail)]
+#[fail = false]
+pub struct StaticDef {
+    /// The name of this static.
+    pub ident: Spanned<TypedIdent>,
+    /// The value.
+    pub value: Spanned<Expr>,
 }
 
 ////////////////////////////////////
@@ -196,6 +209,29 @@ impl Parse for FuncDef {
         })
     }
 }
+
+impl Parse for StaticDef {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        let static_kw = tokens.advance_require(TokenKind::Identifier)?;
+
+        if *static_kw != *STATIC {
+            return Err(ParseError {
+                span: static_kw.span,
+                context: static_kw.span,
+                kind: ParseErrorKind::ExpectedKeyword(OneOrMany::Owned(&STATIC)),
+            });
+        }
+
+        let ident = tokens.spanning(TypedIdent::parse)?;
+        tokens.advance_require(TokenKind::Equal)?;
+
+        let value = tokens.spanning(Expr::parse)?;
+        tokens.advance_require(TokenKind::Semi)?;
+
+        Ok(Self { ident, value })
+    }
+}
+
 impl Parse for Item {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
         let next = tokens.peek_require(TokenKind::Identifier)?;
@@ -206,6 +242,8 @@ impl Parse for Item {
             tokens.with(EnumDef::parse).map(Self::Enum)
         } else if next.t == *FUNC {
             tokens.with(FuncDef::parse).map(Self::FuncDef)
+        } else if next.t == *STATIC {
+            tokens.with(StaticDef::parse).map(Self::StaticDef)
         } else {
             Err(ParseError {
                 span: next.span,
@@ -227,9 +265,12 @@ mod tests {
 
     use crate::{
         CommaSeparated, TypedIdent,
-        expr::{BaseExpr, BinaryExpr, BinaryOp, BlockExpr, Expr},
+        expr::{
+            BaseExpr, BinaryExpr, BinaryOp, BlockExpr, Expr,
+            literal::{Literal, StringLiteral},
+        },
         ident::Ident,
-        item::{Const, EnumDef, EnumVariant, FuncDef, Item, RecordDef},
+        item::{Const, EnumDef, EnumVariant, FuncDef, Item, RecordDef, StaticDef},
         test_util::assert_parse,
     };
 
@@ -399,6 +440,34 @@ mod tests {
                     ),
                 }),
                 Span::new(0, 53),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_static_def() {
+        assert_parse(
+            "static VERSION: str = \"1.0.0\";",
+            Spanned::new(
+                Item::StaticDef(StaticDef {
+                    ident: Spanned::new(
+                        TypedIdent {
+                            ident: Spanned::new(Ident(Symbol::from("VERSION")), Span::new(7, 14)),
+                            ty: Spanned::new(
+                                Spanned::new("str", Span::new(16, 19)).into(),
+                                Span::new(16, 19),
+                            ),
+                        },
+                        Span::new(7, 19),
+                    ),
+                    value: Spanned::new(
+                        Expr::BaseExpr(BaseExpr::Literal(Literal::StringLiteral(
+                            StringLiteral::Value(Symbol::from("1.0.0")),
+                        ))),
+                        Span::new(22, 29),
+                    ),
+                }),
+                Span::new(0, 30),
             ),
         );
     }
