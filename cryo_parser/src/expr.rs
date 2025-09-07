@@ -86,6 +86,8 @@ pub enum BaseExpr {
     CondExpr(CondExpr),
     /// A function call.
     FnCall(FnCall),
+    /// A field access.
+    FieldAccess(FieldAccess),
 }
 
 /// An expression.
@@ -169,6 +171,16 @@ pub struct FnCall {
     pub args: Spanned<CommaSeparated<Expr>>,
 }
 
+/// A field access.
+#[derive(Clone, PartialEq, Eq, Debug, IsFail)]
+#[fail = false]
+pub struct FieldAccess {
+    /// The target, like `ptr` in `box.ptr`.
+    pub target: Box<Spanned<BaseExpr>>,
+    /// The field to access.
+    pub field: Spanned<Ident>,
+}
+
 ////////////////////////////////////
 // Parsers                        //
 ////////////////////////////////////
@@ -243,19 +255,44 @@ impl BaseExpr {
                 .or_else(|_| tokens.with(Ident::parse).map(Self::Binding))
         });
 
-        tokens.with(|tokens| {
-            if tokens.advance_require(TokenKind::LParen).is_ok() {
-                let args = tokens.spanning(CommaSeparated::parse)?;
-                tokens.advance_require(TokenKind::RParen)?;
+        tokens.with(|tokens| Self::parse_2(tokens, expr?))
+    }
 
-                Ok(Self::FnCall(FnCall {
-                    target: expr.map(Box::new)?,
-                    args,
-                }))
-            } else {
-                expr.map(|v| v.t)
-            }
-        })
+    fn parse_2(
+        tokens: &mut cryo_lexer::stream::Guard,
+        expr: Spanned<BaseExpr>,
+    ) -> crate::ParseResult<Self> {
+        if tokens.advance_require(TokenKind::LParen).is_ok() {
+            let args = tokens.spanning(CommaSeparated::parse)?;
+            let (_, span) = tokens.advance_require(TokenKind::RParen)?.tuple();
+            let span = expr.span.extend(span);
+            Self::parse_2(
+                tokens,
+                Spanned::new(
+                    Self::FnCall(FnCall {
+                        target: Box::new(expr),
+                        args,
+                    }),
+                    span,
+                ),
+            )
+        } else if tokens.advance_require(TokenKind::Dot).is_ok() {
+            let field = tokens.spanning(Ident::parse)?;
+            let span = expr.span.extend(field.span);
+
+            Self::parse_2(
+                tokens,
+                Spanned::new(
+                    Self::FieldAccess(FieldAccess {
+                        target: Box::new(expr),
+                        field,
+                    }),
+                    span,
+                ),
+            )
+        } else {
+            Ok(expr.t)
+        }
     }
 }
 
@@ -896,5 +933,34 @@ mod tests {
                 Span::new(0, 21),
             ),
         );
+    }
+
+    #[test]
+    fn parse_field_access() {
+        assert_parse(
+            "box.leak()",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::FnCall(FnCall {
+                    target: Box::new(Spanned::new(
+                        BaseExpr::FieldAccess(FieldAccess {
+                            target: Box::new(Spanned::new(
+                                BaseExpr::Binding(Ident(Symbol::from("box"))),
+                                Span::new(0, 3),
+                            )),
+                            field: Spanned::new(Ident(Symbol::from("leak")), Span::new(4, 8)),
+                        }),
+                        Span::new(0, 8),
+                    )),
+                    args: Spanned::new(
+                        CommaSeparated {
+                            inner: vec![],
+                            last: None,
+                        },
+                        Span::new(9, 9),
+                    ),
+                })),
+                Span::new(0, 10),
+            ),
+        )
     }
 }
