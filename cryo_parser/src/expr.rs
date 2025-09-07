@@ -5,7 +5,7 @@ use cryo_parser_proc_macro::IsFail;
 use cryo_span::Spanned;
 
 use crate::{
-    IsFail, OneOrMany, Parse, ParseError, ParseErrorKind,
+    CommaSeparated, IsFail, OneOrMany, Parse, ParseError, ParseErrorKind,
     expr::literal::Literal,
     ident::{ELSE, IF, Ident},
     stmt::Stmt,
@@ -84,6 +84,8 @@ pub enum BaseExpr {
     Block(BlockExpr),
     /// A conditional expression.
     CondExpr(CondExpr),
+    /// A function call.
+    FnCall(FnCall),
 }
 
 /// An expression.
@@ -157,6 +159,16 @@ pub struct IfBlock {
     pub block: Spanned<BlockExpr>,
 }
 
+/// A function call.
+#[derive(Clone, PartialEq, Eq, Debug, IsFail)]
+#[fail = false]
+pub struct FnCall {
+    /// The target, like `print` in `print("Hello, world")`.
+    pub target: Box<Spanned<BaseExpr>>,
+    /// The arguments.
+    pub args: Spanned<CommaSeparated<Expr>>,
+}
+
 ////////////////////////////////////
 // Parsers                        //
 ////////////////////////////////////
@@ -222,12 +234,28 @@ impl BaseExpr {
             }));
         }
 
-        tokens
-            .with(Literal::parse)
-            .map(Self::Literal)
-            .or_else(|_| tokens.with(CondExpr::parse).map(Self::CondExpr))
-            .or_else(|_| tokens.with(BlockExpr::parse).map(Self::Block))
-            .or_else(|_| tokens.with(Ident::parse).map(Self::Binding))
+        let expr = tokens.spanning(|tokens| {
+            tokens
+                .with(Literal::parse)
+                .map(Self::Literal)
+                .or_else(|_| tokens.with(CondExpr::parse).map(Self::CondExpr))
+                .or_else(|_| tokens.with(BlockExpr::parse).map(Self::Block))
+                .or_else(|_| tokens.with(Ident::parse).map(Self::Binding))
+        });
+
+        tokens.with(|tokens| {
+            if tokens.advance_require(TokenKind::LParen).is_ok() {
+                let args = tokens.spanning(CommaSeparated::parse)?;
+                tokens.advance_require(TokenKind::RParen)?;
+
+                Ok(Self::FnCall(FnCall {
+                    target: expr.map(Box::new)?,
+                    args,
+                }))
+            } else {
+                expr.map(|v| v.t)
+            }
+        })
     }
 }
 
@@ -389,6 +417,18 @@ impl Parse for CondExpr {
             else_if_blocks,
             else_block,
         })
+    }
+}
+
+#[cfg(false)]
+impl Parse for FnCall {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        let target = tokens.spanning(BaseExpr::parse).map(Box::new)?;
+        tokens.advance_require(TokenKind::LParen)?;
+        let args = tokens.spanning(CommaSeparated::parse)?;
+        tokens.advance_require(TokenKind::RParen)?;
+
+        Ok(Self { target, args })
     }
 }
 
@@ -583,7 +623,11 @@ mod tests {
     use cryo_lexer::Symbol;
     use cryo_span::{Span, Spanned};
 
-    use crate::{expr::literal::IntegerLiteral, stmt::BindingDef, test_util::assert_parse};
+    use crate::{
+        expr::literal::{IntegerLiteral, StringLiteral},
+        stmt::BindingDef,
+        test_util::assert_parse,
+    };
 
     #[test]
     fn parse_bin_expr() {
@@ -822,6 +866,34 @@ mod tests {
                     )),
                 })),
                 Span::new(0, 35),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_fn_call() {
+        assert_parse(
+            "print(\"Hello, world\")",
+            Spanned::new(
+                Expr::BaseExpr(BaseExpr::FnCall(FnCall {
+                    target: Box::new(Spanned::new(
+                        BaseExpr::Binding(Ident(Symbol::from("print"))),
+                        Span::new(0, 5),
+                    )),
+                    args: Spanned::new(
+                        CommaSeparated {
+                            inner: vec![],
+                            last: Some(Box::new(Spanned::new(
+                                Expr::BaseExpr(BaseExpr::Literal(Literal::StringLiteral(
+                                    StringLiteral::Value(Symbol::from("Hello, world")),
+                                ))),
+                                Span::new(6, 20),
+                            ))),
+                        },
+                        Span::new(6, 20),
+                    ),
+                })),
+                Span::new(0, 21),
             ),
         );
     }
