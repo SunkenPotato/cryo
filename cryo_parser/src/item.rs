@@ -111,8 +111,14 @@ pub struct Module {
     /// The identifier.
     pub ident: Spanned<Ident>,
     /// The contained items.
-    pub items: Vec<Spanned<Item>>,
+    pub items: OutlineModule,
 }
+
+/// An outlined module, such as the one defined in your main source file.
+pub type OutlineModule = Vec<Spanned<Item>>;
+
+#[rustfmt::skip]
+impl IsFail for OutlineModule { fn is_fail(&self) -> bool { false } }
 
 ////////////////////////////////////
 // Parsers                        //
@@ -257,16 +263,24 @@ impl Parse for Module {
         }
 
         let ident = tokens.spanning(Ident::parse)?;
+
         tokens.advance_require(TokenKind::LCurly)?;
-        let mut items = vec![];
-
-        while let Ok(item) = tokens.spanning(Item::parse) {
-            items.push(item);
-        }
-
+        let items = tokens.with(OutlineModule::parse)?;
         tokens.advance_require(TokenKind::RCurly)?;
 
         Ok(Self { ident, items })
+    }
+}
+
+impl Parse for OutlineModule {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        let mut buf = Self::new();
+
+        while let Ok(item) = tokens.spanning(Item::parse) {
+            buf.push(item);
+        }
+
+        Ok(buf)
     }
 }
 
