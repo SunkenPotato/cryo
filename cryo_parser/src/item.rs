@@ -12,7 +12,7 @@ use cryo_parser_proc_macro::IsFail;
 use cryo_span::Spanned;
 use internment::Intern;
 
-/// A top-level item, such as a struct.
+/// A top-level item, such as a record.
 #[derive(Clone, PartialEq, Eq, Debug, IsFail)]
 #[fail(bubble)]
 pub enum Item {
