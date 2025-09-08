@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use crate::{
     CommaSeparated, IsFail, OneOrMany, Parse, ParseError, ParseErrorKind, Path, TypedIdent,
     expr::{BlockExpr, Expr},
-    ident::{CONST, ENUM, FUNC, Ident, RECORD, STATIC},
+    ident::{CONST, ENUM, FUNC, Ident, MOD, RECORD, STATIC},
 };
 use cryo_lexer::{TokenKind, stream::StreamLike};
 use cryo_parser_proc_macro::IsFail;
@@ -24,10 +24,12 @@ pub enum Item {
     FuncDef(FuncDef),
     /// A static definition.
     StaticDef(StaticDef),
+    /// A module definition.
+    Module(Module),
 }
 
 impl Item {
-    const ACCEPTED_KEYWORDS: &[&LazyLock<Intern<str>>] = &[&RECORD, &ENUM, &FUNC, &STATIC];
+    const ACCEPTED_KEYWORDS: &[&LazyLock<Intern<str>>] = &[&RECORD, &ENUM, &FUNC, &STATIC, &MOD];
 }
 
 /// A record definition.
@@ -100,6 +102,16 @@ pub struct StaticDef {
     pub ident: Spanned<TypedIdent>,
     /// The value.
     pub value: Spanned<Expr>,
+}
+
+/// A module.
+#[derive(Clone, PartialEq, Eq, Debug, IsFail)]
+#[fail = false]
+pub struct Module {
+    /// The identifier.
+    pub ident: Spanned<Ident>,
+    /// The contained items.
+    pub items: Vec<Spanned<Item>>,
 }
 
 ////////////////////////////////////
@@ -232,6 +244,32 @@ impl Parse for StaticDef {
     }
 }
 
+impl Parse for Module {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        let mod_kw = tokens.advance_require(TokenKind::Identifier)?;
+
+        if *mod_kw != *MOD {
+            return Err(ParseError {
+                span: mod_kw.span,
+                context: mod_kw.span,
+                kind: ParseErrorKind::ExpectedKeyword(OneOrMany::Owned(&MOD)),
+            });
+        }
+
+        let ident = tokens.spanning(Ident::parse)?;
+        tokens.advance_require(TokenKind::LCurly)?;
+        let mut items = vec![];
+
+        while let Ok(item) = tokens.spanning(Item::parse) {
+            items.push(item);
+        }
+
+        tokens.advance_require(TokenKind::RCurly)?;
+
+        Ok(Self { ident, items })
+    }
+}
+
 impl Parse for Item {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
         let next = tokens.peek_require(TokenKind::Identifier)?;
@@ -244,6 +282,8 @@ impl Parse for Item {
             tokens.with(FuncDef::parse).map(Self::FuncDef)
         } else if next.t == *STATIC {
             tokens.with(StaticDef::parse).map(Self::StaticDef)
+        } else if next.t == *MOD {
+            tokens.with(Module::parse).map(Self::Module)
         } else {
             Err(ParseError {
                 span: next.span,
@@ -270,7 +310,7 @@ mod tests {
             literal::{Literal, StringLiteral},
         },
         ident::Ident,
-        item::{Const, EnumDef, EnumVariant, FuncDef, Item, RecordDef, StaticDef},
+        item::{Const, EnumDef, EnumVariant, FuncDef, Item, Module, RecordDef, StaticDef},
         test_util::assert_parse,
     };
 
@@ -468,6 +508,107 @@ mod tests {
                     ),
                 }),
                 Span::new(0, 30),
+            ),
+        );
+    }
+
+    #[test]
+    fn parse_mod() {
+        assert_parse(
+            "mod greet { func add(lhs: int, rhs: int) const: int { lhs + rhs } }",
+            Spanned::new(
+                Item::Module(Module {
+                    ident: Spanned::new(Ident(Symbol::from("greet")), Span::new(4, 9)),
+                    items: vec![Spanned::new(
+                        Item::FuncDef(FuncDef {
+                            ident: Spanned::new(
+                                Ident(Symbol::from("add")),
+                                Span::new(5 + 12, 8 + 12),
+                            ),
+                            args: Spanned::new(
+                                CommaSeparated {
+                                    inner: vec![(
+                                        Spanned::new(
+                                            TypedIdent {
+                                                ident: Spanned::new(
+                                                    Ident(Symbol::from("lhs")),
+                                                    Span::new(9 + 12, 12 + 12),
+                                                ),
+                                                ty: Spanned::new(
+                                                    Spanned::new(
+                                                        "int",
+                                                        Span::new(14 + 12, 17 + 12),
+                                                    )
+                                                    .into(),
+                                                    Span::new(14 + 12, 17 + 12),
+                                                ),
+                                            },
+                                            Span::new(9 + 12, 17 + 12),
+                                        ),
+                                        Spanned::new(Comma, Span::new(17 + 12, 18 + 12)),
+                                    )],
+                                    last: Some(Box::new(Spanned::new(
+                                        TypedIdent {
+                                            ident: Spanned::new(
+                                                Ident(Symbol::from("rhs")),
+                                                Span::new(19 + 12, 22 + 12),
+                                            ),
+                                            ty: Spanned::new(
+                                                Spanned::new("int", Span::new(24 + 12, 27 + 12))
+                                                    .into(),
+                                                Span::new(24 + 12, 27 + 12),
+                                            ),
+                                        },
+                                        Span::new(19 + 12, 27 + 12),
+                                    ))),
+                                },
+                                Span::new(9 + 12, 27 + 12),
+                            ),
+                            is_const: Some(Spanned::new(Const, Span::new(29 + 12, 34 + 12))),
+                            ret_ty: Some(Spanned::new(
+                                Spanned::new("int", Span::new(36 + 12, 39 + 12)).into(),
+                                Span::new(36 + 12, 39 + 12),
+                            )),
+                            body: Spanned::new(
+                                BlockExpr {
+                                    stmts: vec![],
+                                    tail: Some(Box::new(Spanned::new(
+                                        Expr::BinaryExpr(BinaryExpr {
+                                            lhs: Box::new(Spanned::new(
+                                                Expr::BaseExpr(BaseExpr::Path(
+                                                    Spanned::new(
+                                                        "lhs",
+                                                        Span::new(42 + 12, 45 + 12),
+                                                    )
+                                                    .into(),
+                                                )),
+                                                Span::new(42 + 12, 45 + 12),
+                                            )),
+                                            op: Spanned::new(
+                                                BinaryOp::Add,
+                                                Span::new(46 + 12, 47 + 12),
+                                            ),
+                                            rhs: Box::new(Spanned::new(
+                                                Expr::BaseExpr(BaseExpr::Path(
+                                                    Spanned::new(
+                                                        "rhs",
+                                                        Span::new(48 + 12, 51 + 12),
+                                                    )
+                                                    .into(),
+                                                )),
+                                                Span::new(48 + 12, 51 + 12),
+                                            )),
+                                        }),
+                                        Span::new(42 + 12, 51 + 12),
+                                    ))),
+                                },
+                                Span::new(40 + 12, 53 + 12),
+                            ),
+                        }),
+                        Span::new(12, 53 + 12),
+                    )],
+                }),
+                Span::new(0, 67),
             ),
         );
     }

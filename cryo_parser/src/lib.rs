@@ -1,5 +1,4 @@
 //! Parser for the `cryo` language.
-#![feature(sync_unsafe_cell)]
 
 #[cfg(test)]
 mod test_util;
@@ -11,7 +10,7 @@ pub mod stmt;
 
 use std::sync::LazyLock;
 
-use cryo_diagnostic::{Diagnostics, SourceFile};
+use cryo_diagnostic::SourceFile;
 use cryo_lexer::{
     Token, TokenKind,
     atoms::Comma,
@@ -91,6 +90,7 @@ impl PartialEq for ParseErrorKind {
         }
     }
 }
+
 impl Eq for ParseErrorKind {}
 
 /// Utility for storing either one or more of `T`.
@@ -233,38 +233,27 @@ impl From<Spanned<&str>> for Path {
     }
 }
 
+/// An error returned by a [`Parser`]. This differs from [`ParseError`].
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ParserError {
+    /// The input was not fully consumed.
+    InputNotConsumed,
+    /// A parse error was encountered.
+    ParseError(ParseError),
+}
+
 /// A parser.
 #[derive(Debug)]
-pub struct Parser<'d> {
+pub struct Parser {
     /// The tokenstream this parser operates on.
     pub stream: TokenStream,
     /// The source of the inner tokenstream.
     pub source: SourceFile,
-    /// The diagnostics reported by subparsers.
-    pub diagnostics: &'d mut Diagnostics,
 }
 
-impl<'d> Parser<'d> {
+impl Parser {
     /// Create a new parser.
-    pub const fn new(
-        stream: TokenStream,
-        source: SourceFile,
-        diagnostics: &'d mut Diagnostics,
-    ) -> Self {
-        Self {
-            stream,
-            source,
-            diagnostics,
-        }
-    }
-
-    /// Parse the given inputs.
-    pub fn parse(self) -> Result<(SourceFile, AbstractSyntaxTree), ParseError> {
-        todo!()
+    pub const fn new(stream: TokenStream, source: SourceFile) -> Self {
+        Self { stream, source }
     }
 }
-
-/// An abstract syntax tree, produced by a parser.
-pub struct AbstractSyntaxTree {}
-
-impl AbstractSyntaxTree {}

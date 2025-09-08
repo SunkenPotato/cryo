@@ -30,6 +30,7 @@ keywords! {
     CONST = "const"
     STATIC = "static"
     IMPORT = "import"
+    MOD = "mod"
 }
 
 /// An identifier.
