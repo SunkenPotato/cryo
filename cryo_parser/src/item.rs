@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 
 use crate::{
     CommaSeparated, IsFail, OneOrMany, Parse, ParseError, ParseErrorKind, Path, TypedIdent,
+    attr::Attr,
     expr::{BlockExpr, Expr},
     ident::{CONST, ENUM, FUNC, Ident, MOD, RECORD, STATIC},
 };
@@ -12,10 +13,48 @@ use cryo_parser_proc_macro::IsFail;
 use cryo_span::Spanned;
 use internment::Intern;
 
-/// A top-level item, such as a record.
+/// An item, with optional attributes.
+#[derive(Debug, PartialEq, Eq, Clone, IsFail)]
+#[fail = false]
+pub struct Item {
+    /// The attributes on this item.
+    pub attrs: Vec<Spanned<Attr>>,
+    /// The item itself.
+    pub item: Spanned<ItemKind>,
+}
+
+impl Item {
+    /// Creates a [`Spanned<Item>`] which has no attributes and inherits the span of the argument passed to this function.
+    #[cfg(test)]
+    pub const fn no_attrs(item: Spanned<ItemKind>) -> Spanned<Self> {
+        let span = item.span;
+        Spanned::new(
+            Self {
+                attrs: Vec::new(),
+                item,
+            },
+            span,
+        )
+    }
+}
+
+impl Parse for Item {
+    fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
+        let mut attrs = vec![];
+        while let Ok(t) = tokens.spanning(Attr::parse) {
+            attrs.push(t);
+        }
+
+        let item = tokens.spanning(ItemKind::parse)?;
+
+        Ok(Self { attrs, item })
+    }
+}
+
+/// A top-level item, such as a record. This does not contain attributes.
 #[derive(Clone, PartialEq, Eq, Debug, IsFail)]
 #[fail(bubble)]
-pub enum Item {
+pub enum ItemKind {
     /// A record definition.
     Record(RecordDef),
     /// An enum definition.
@@ -28,7 +67,7 @@ pub enum Item {
     Module(Module),
 }
 
-impl Item {
+impl ItemKind {
     const ACCEPTED_KEYWORDS: &[&LazyLock<Intern<str>>] = &[&RECORD, &ENUM, &FUNC, &STATIC, &MOD];
 }
 
@@ -284,7 +323,7 @@ impl Parse for OutlineModule {
     }
 }
 
-impl Parse for Item {
+impl Parse for ItemKind {
     fn parse(tokens: &mut cryo_lexer::stream::Guard) -> crate::ParseResult<Self> {
         let next = tokens.peek_require(TokenKind::Identifier)?;
 
@@ -324,7 +363,9 @@ mod tests {
             literal::{Literal, StringLiteral},
         },
         ident::Ident,
-        item::{Const, EnumDef, EnumVariant, FuncDef, Item, Module, RecordDef, StaticDef},
+        item::{
+            Const, EnumDef, EnumVariant, FuncDef, Item, ItemKind, Module, RecordDef, StaticDef,
+        },
         test_util::assert_parse,
     };
 
@@ -332,8 +373,8 @@ mod tests {
     fn parse_record() {
         assert_parse(
             "record Point(x: int, y: int);",
-            Spanned::new(
-                Item::Record(RecordDef {
+            Item::no_attrs(Spanned::new(
+                ItemKind::Record(RecordDef {
                     ident: Spanned::new(Ident(Symbol::from("Point")), Span::new(7, 12)),
                     fields: Spanned::new(
                         CommaSeparated {
@@ -371,7 +412,7 @@ mod tests {
                     ),
                 }),
                 Span::new(0, 29),
-            ),
+            )),
         );
     }
 
@@ -379,8 +420,8 @@ mod tests {
     fn parse_enum_def() {
         assert_parse(
             "enum X { A(i32), B(i32) }",
-            Spanned::new(
-                Item::Enum(EnumDef {
+            Item::no_attrs(Spanned::new(
+                ItemKind::Enum(EnumDef {
                     ident: Spanned::new(Ident(Symbol::from("X")), Span::new(5, 6)),
                     variants: Spanned::new(
                         CommaSeparated {
@@ -418,7 +459,7 @@ mod tests {
                     ),
                 }),
                 Span::new(0, 25),
-            ),
+            )),
         );
     }
 
@@ -426,8 +467,8 @@ mod tests {
     fn parse_fn_def() {
         assert_parse(
             "func add(lhs: int, rhs: int) const: int { lhs + rhs }",
-            Spanned::new(
-                Item::FuncDef(FuncDef {
+            Item::no_attrs(Spanned::new(
+                ItemKind::FuncDef(FuncDef {
                     ident: Spanned::new(Ident(Symbol::from("add")), Span::new(5, 8)),
                     args: Spanned::new(
                         CommaSeparated {
@@ -494,7 +535,7 @@ mod tests {
                     ),
                 }),
                 Span::new(0, 53),
-            ),
+            )),
         );
     }
 
@@ -502,8 +543,8 @@ mod tests {
     fn parse_static_def() {
         assert_parse(
             "static VERSION: str = \"1.0.0\";",
-            Spanned::new(
-                Item::StaticDef(StaticDef {
+            Item::no_attrs(Spanned::new(
+                ItemKind::StaticDef(StaticDef {
                     ident: Spanned::new(
                         TypedIdent {
                             ident: Spanned::new(Ident(Symbol::from("VERSION")), Span::new(7, 14)),
@@ -522,7 +563,7 @@ mod tests {
                     ),
                 }),
                 Span::new(0, 30),
-            ),
+            )),
         );
     }
 
@@ -530,11 +571,11 @@ mod tests {
     fn parse_mod() {
         assert_parse(
             "mod greet { func add(lhs: int, rhs: int) const: int { lhs + rhs } }",
-            Spanned::new(
-                Item::Module(Module {
+            Item::no_attrs(Spanned::new(
+                ItemKind::Module(Module {
                     ident: Spanned::new(Ident(Symbol::from("greet")), Span::new(4, 9)),
-                    items: vec![Spanned::new(
-                        Item::FuncDef(FuncDef {
+                    items: vec![Item::no_attrs(Spanned::new(
+                        ItemKind::FuncDef(FuncDef {
                             ident: Spanned::new(
                                 Ident(Symbol::from("add")),
                                 Span::new(5 + 12, 8 + 12),
@@ -620,10 +661,10 @@ mod tests {
                             ),
                         }),
                         Span::new(12, 53 + 12),
-                    )],
+                    ))],
                 }),
                 Span::new(0, 67),
-            ),
+            )),
         );
     }
 }

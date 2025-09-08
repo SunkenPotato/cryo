@@ -1,4 +1,5 @@
 //! Parser for the `cryo` language.
+#![feature(iterator_try_collect)]
 
 #[cfg(test)]
 mod test_util;
