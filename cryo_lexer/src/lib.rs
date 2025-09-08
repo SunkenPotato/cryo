@@ -17,8 +17,8 @@ use internment::Intern;
 
 use crate::{
     atoms::{
-        Bang, Colon, Comma, Dot, Equal, LCurly, LParen, Minus, Percent, Plus, RCurly, RParen, Semi,
-        Slash, Star,
+        At, Bang, Colon, Comma, Dot, Equal, LCurly, LParen, Minus, Percent, Plus, RCurly, RParen,
+        Semi, Slash, Star,
     },
     identifier::Identifier,
     literal::Literal,
@@ -120,6 +120,7 @@ pub enum TokenKind {
     Comma,
     Colon,
     Dot,
+    At,
 }
 
 trait Sealed {}
@@ -151,6 +152,7 @@ impl TokenKind {
         RParen::lex,
         Colon::lex,
         Dot::lex,
+        At::lex,
     ];
 }
 

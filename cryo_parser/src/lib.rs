@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod test_util;
 
+pub mod attr;
 pub mod expr;
 pub mod ident;
 pub mod item;
@@ -31,6 +32,7 @@ pub trait Parse: Sized + IsFail {
 }
 
 /// Trait for checking whether parser productions are partial or complete fails, so that they may be reinterpreted as diagnostics.
+#[deprecated]
 pub trait IsFail {
     /// Check whether `self` is an error variant.
     fn is_fail(&self) -> bool;
