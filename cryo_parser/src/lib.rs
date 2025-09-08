@@ -10,7 +10,7 @@ pub mod stmt;
 
 use std::sync::LazyLock;
 
-use cryo_diagnostic::SourceFile;
+use cryo_diagnostic::{Diagnostics, SourceFile};
 use cryo_lexer::{
     Token, TokenKind,
     atoms::Comma,
@@ -19,7 +19,7 @@ use cryo_lexer::{
 use cryo_span::{Span, Spanned};
 use internment::Intern;
 
-use crate::ident::Ident;
+use crate::{ident::Ident, item::OutlineModule};
 
 /// The result of a parser.
 pub type ParseResult<T> = Result<T, ParseError>;
@@ -244,16 +244,40 @@ pub enum ParserError {
 
 /// A parser.
 #[derive(Debug)]
-pub struct Parser {
+pub struct Parser<'d> {
     /// The tokenstream this parser operates on.
     pub stream: TokenStream,
     /// The source of the inner tokenstream.
     pub source: SourceFile,
+    /// The diagnostics.
+    pub diagnostics: &'d mut Diagnostics,
 }
 
-impl Parser {
+impl<'d> Parser<'d> {
     /// Create a new parser.
-    pub const fn new(stream: TokenStream, source: SourceFile) -> Self {
-        Self { stream, source }
+    pub const fn new(
+        stream: TokenStream,
+        source: SourceFile,
+        diagnostics: &'d mut Diagnostics,
+    ) -> Self {
+        Self {
+            stream,
+            source,
+            diagnostics,
+        }
+    }
+
+    /// Parse the given inputs into an [`OutlineModule`].
+    pub fn parse(mut self) -> Result<(SourceFile, OutlineModule), ParserError> {
+        let module = self
+            .stream
+            .with(OutlineModule::parse)
+            .map_err(ParserError::ParseError)?;
+
+        if !self.stream.all().is_empty() {
+            return Err(ParserError::InputNotConsumed);
+        }
+
+        Ok((self.source, module))
     }
 }
